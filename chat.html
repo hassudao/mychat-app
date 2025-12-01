@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>MyChat フォロー版</title>
+<title>MyChat 通知センター版</title>
 <style>
 body { font-family:sans-serif; margin:0; display:flex; height:100vh; }
 body.dark { background-color:#1e1e1e; color:#f0f0f0; }
@@ -27,6 +27,11 @@ body.dark .userItem:hover { background:#444; }
 .activeUser { background:#aaa !important; }
 #friendSearch { width:100%; padding:4px; margin-bottom:4px; box-sizing:border-box; }
 #searchResults { max-height:150px; overflow-y:auto; border:1px solid #ccc; padding:4px; margin-bottom:6px; }
+#notifBtn { position:absolute; right:20px; top:10px; padding:6px 12px; cursor:pointer; }
+#notifPanel { position:absolute; right:20px; top:50px; width:250px; max-height:400px; overflow-y:auto; background:#fff; border:1px solid #ccc; display:none; z-index:1000; }
+body.dark #notifPanel { background:#333; color:#fff; border-color:#555; }
+.notifItem { border-bottom:1px solid #ccc; padding:4px; display:flex; justify-content:space-between; align-items:center; }
+body.dark .notifItem { border-color:#555; }
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -43,6 +48,8 @@ body.dark .userItem:hover { background:#444; }
   <div>
     <button id="modeToggle">🌙 / ☀️ モード切替</button>
     <button id="settingsBtn">⚙️ 設定</button>
+    <button id="notifBtn">🔔 通知</button>
+    <div id="notifPanel"></div>
   </div>
   <div id="messages"></div>
   <div id="inputArea">
@@ -92,6 +99,7 @@ auth.onAuthStateChanged(user=>{
     email: user.email || ""
   });
   loadFollowedUsers();
+  loadNotifications();
 });
 
 // ----------------- フォロー中ユーザー表示 -----------------
@@ -124,10 +132,11 @@ function loadFollowedUsers(){
 }
 
 // ----------------- 検索 + フォロー -----------------
-const searchBtn=document.getElementById("friendSearch");
+const searchInput=document.getElementById("friendSearch");
 const searchResults=document.getElementById("searchResults");
-searchBtn.addEventListener("input", ()=>{
-  const keyword=searchBtn.value.toLowerCase();
+searchInput.addEventListener("input", ()=>{
+  const keyword = searchInput.value.trim().toLowerCase();
+  if(!keyword){ searchResults.innerHTML=""; return; }
   database.ref("users").once("value").then(snapshot=>{
     const data=snapshot.val();
     const results=[];
@@ -148,11 +157,40 @@ function showSearchResults(results){
   results.forEach(user=>{
     const div=document.createElement("div");
     div.classList.add("userItem");
-    div.textContent=user.displayName+" ("+user.email+")";
+    const avatarDiv=document.createElement("div");
+    avatarDiv.classList.add("avatar");
+    if(user.photoURL){
+      const img=document.createElement("img");
+      img.src=user.photoURL;
+      img.style.width="32px";
+      img.style.height="32px";
+      img.style.borderRadius="50%";
+      avatarDiv.appendChild(img);
+    } else {
+      avatarDiv.textContent=user.displayName[0].toUpperCase();
+      avatarDiv.style.backgroundColor="#666";
+      avatarDiv.style.color="#fff";
+      avatarDiv.style.display="flex";
+      avatarDiv.style.alignItems="center";
+      avatarDiv.style.justifyContent="center";
+    }
+    div.appendChild(avatarDiv);
+    const nameDiv=document.createElement("span");
+    nameDiv.textContent = user.displayName+" ("+user.email+")";
+    div.appendChild(nameDiv);
+
     const followBtn=document.createElement("button");
     followBtn.textContent="フォロー";
     followBtn.addEventListener("click", ()=>{
       database.ref("follows/"+currentUser.uid+"/"+user.uid).set(true);
+      // 通知
+      database.ref("notifications/"+user.uid).push({
+        type: "follow",
+        fromUid: currentUser.uid,
+        fromName: currentUser.displayName || "名無し",
+        timestamp: Date.now(),
+        read: false
+      });
       alert("フォローしました！");
       div.remove();
     });
@@ -237,6 +275,36 @@ function sendMessage(){
     timestamp: Date.now()
   });
   msgInput.value="";
+}
+
+// ----------------- 通知センター -----------------
+const notifBtn=document.getElementById("notifBtn");
+const notifPanel=document.getElementById("notifPanel");
+notifBtn.addEventListener("click", ()=>{ notifPanel.style.display = notifPanel.style.display==="none"?"block":"none"; });
+
+function loadNotifications(){
+  database.ref("notifications/"+currentUser.uid).on("value", snapshot=>{
+    const data = snapshot.val();
+    notifPanel.innerHTML="";
+    if(data){
+      Object.entries(data).sort((a,b)=>b[1].timestamp-a[1].timestamp).forEach(([id,notif])=>{
+        const div=document.createElement("div");
+        div.classList.add("notifItem");
+        if(notif.type==="follow"){
+          div.textContent = notif.fromName + " さんがフォローしました";
+          const backBtn=document.createElement("button");
+          backBtn.textContent="フォローバック";
+          backBtn.addEventListener("click", ()=>{
+            database.ref("follows/"+currentUser.uid+"/"+notif.fromUid).set(true);
+            database.ref("notifications/"+currentUser.uid+"/"+id+"/read").set(true);
+            div.remove();
+          });
+          div.appendChild(backBtn);
+        }
+        notifPanel.appendChild(div);
+      });
+    }
+  });
 }
 </script>
 </body>
