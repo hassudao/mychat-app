@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>MyChat 通知センター強化版</title>
+<title>MyChat 時刻対応版</title>
 <style>
 body { font-family:sans-serif; margin:0; display:flex; height:100vh; }
 body.dark { background-color:#1e1e1e; color:#f0f0f0; }
@@ -11,13 +11,15 @@ body.dark { background-color:#1e1e1e; color:#f0f0f0; }
 #messages { flex:1; overflow-y:scroll; border:1px solid #ccc; padding:10px; margin-bottom:6px; display:flex; flex-direction:column; }
 .message { display:flex; align-items:flex-start; margin-bottom:6px; }
 .avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; flex-shrink:0; }
-.content { background:#f0f0f0; padding:6px 10px; border-radius:12px; max-width:300px; word-wrap:break-word; }
+.content { background:#f0f0f0; padding:6px 10px; border-radius:12px; max-width:300px; word-wrap:break-word; position:relative; }
 .myMessage { justify-content:flex-end; }
 .myMessage .content { background:#007bff; color:#fff; margin-left:8px; }
 .myMessage .avatar { order:2; margin-left:8px; margin-right:0; }
 .otherMessage { justify-content:flex-start; }
 .otherMessage .content { margin-right:8px; }
 body.dark .content { background:#333; color:#fff; }
+.timestamp { font-size:10px; color:#666; text-align:right; margin-top:2px; }
+body.dark .timestamp { color:#aaa; }
 #inputArea { display:flex; }
 #msgInput { flex:1; padding:5px; }
 button { padding:5px 10px; margin-left:4px; }
@@ -30,10 +32,12 @@ body.dark .userItem:hover { background:#444; }
 #notifBtn { position:absolute; right:20px; top:10px; padding:6px 12px; cursor:pointer; }
 #notifPanel { position:absolute; right:20px; top:50px; width:250px; max-height:400px; overflow-y:auto; background:#fff; border:1px solid #ccc; display:none; z-index:1000; }
 body.dark #notifPanel { background:#333; color:#fff; border-color:#555; }
-.notifItem { border-bottom:1px solid #ccc; padding:4px; display:flex; justify-content:space-between; align-items:center; }
+.notifItem { border-bottom:1px solid #ccc; padding:4px; display:flex; justify-content:space-between; align-items:center; flex-direction:column; }
 body.dark .notifItem { border-color:#555; }
 .notifUnread { background:#def; }
 body.dark .notifUnread { background:#555; }
+.notifTime { font-size:10px; color:#666; }
+body.dark .notifTime { color:#aaa; }
 </style>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -184,7 +188,6 @@ function showSearchResults(results){
     followBtn.textContent="フォロー";
     followBtn.addEventListener("click", ()=>{
       database.ref("follows/"+currentUser.uid+"/"+user.uid).set(true);
-      // 通知
       database.ref("notifications/"+user.uid).push({
         type: "follow",
         fromUid: currentUser.uid,
@@ -240,7 +243,7 @@ function selectUser(uid,name){
             }
             const contentDiv=document.createElement("div");
             contentDiv.classList.add("content");
-            contentDiv.textContent=m.content;
+            contentDiv.innerHTML = m.content + `<div class="timestamp">${new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
             div.appendChild(avatarDiv);
             div.appendChild(contentDiv);
             messagesDiv.appendChild(div);
@@ -290,6 +293,10 @@ function loadNotifications(){
         div.classList.add("notifItem");
         if(!notif.read) div.classList.add("notifUnread");
 
+        const timeDiv=document.createElement("div");
+        timeDiv.classList.add("notifTime");
+        timeDiv.textContent = new Date(notif.timestamp).toLocaleString([], {hour:'2-digit', minute:'2-digit', month:'numeric', day:'numeric'});
+
         if(notif.type==="follow"){
           div.textContent = notif.fromName + " さんがフォローしました";
           const backBtn=document.createElement("button");
@@ -310,6 +317,7 @@ function loadNotifications(){
           });
           div.appendChild(okBtn);
         }
+        div.appendChild(timeDiv);
         notifPanel.appendChild(div);
       });
     }
@@ -322,4 +330,4 @@ function updateNotifBadge(notifs){
 }
 </script>
 </body>
-</html>
+  </html>
