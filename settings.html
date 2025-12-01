@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>ユーザー設定</title>
+  <style>
+    body { font-family:sans-serif; text-align:center; padding:20px; }
+    body.dark { background-color:#1e1e1e; color:#f0f0f0; }
+    input, button { padding:6px 10px; margin:4px; }
+    img { width:64px; height:64px; border-radius:50%; margin:6px; }
+  </style>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+</head>
+<body>
+  <h2>ユーザー設定</h2>
+  <div>
+    <input type="text" id="usernameInput" placeholder="ユーザー名">
+    <br>
+    <input type="file" id="avatarInput" accept="image/*">
+    <br>
+    <button id="saveBtn">保存</button>
+  </div>
+  <div id="preview"></div>
+
+  <script>
+    // Firebase 初期化
+    const firebaseConfig = {
+      apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
+      authDomain: "chatapp-hassu.firebaseapp.com",
+      databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "chatapp-hassu",
+      storageBucket: "chatapp-hassu.appspot.com",
+      messagingSenderId: "8489684752",
+      appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const storage = firebase.storage();
+
+    const usernameInput = document.getElementById("usernameInput");
+    const avatarInput = document.getElementById("avatarInput");
+    const saveBtn = document.getElementById("saveBtn");
+    const preview = document.getElementById("preview");
+
+    // ログインチェック
+    auth.onAuthStateChanged(user=>{
+      if(!user) location.href = "index.html";
+      else if(user.displayName) usernameInput.value = user.displayName;
+      else if(user.photoURL) {
+        const img = document.createElement("img");
+        img.src = user.photoURL;
+        preview.appendChild(img);
+      }
+    });
+
+    avatarInput.addEventListener("change", ()=>{
+      preview.innerHTML = "";
+      const file = avatarInput.files[0];
+      if(file){
+        const img = document.createElement("img");
+        img.src = URL.createObjectURL(file);
+        preview.appendChild(img);
+      }
+    });
+
+    saveBtn.addEventListener("click", async ()=>{
+      const user = auth.currentUser;
+      const name = usernameInput.value.trim();
+      if(!name) return alert("名前を入力してね");
+      
+      let photoURL = user.photoURL || "";
+      if(avatarInput.files[0]){
+        const file = avatarInput.files[0];
+        const storageRef = storage.ref().child("avatars/"+user.uid+"/"+file.name);
+        const snapshot = await storageRef.put(file);
+        photoURL = await snapshot.ref.getDownloadURL();
+      }
+
+      user.updateProfile({ displayName: name, photoURL: photoURL })
+          .then(()=>alert("保存完了！"))
+          .catch(e=>alert(e.message));
+    });
+  </script>
+</body>
+</html>
