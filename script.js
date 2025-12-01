@@ -1,27 +1,10 @@
 // ---------------------
-// ダークモード切替
+// Firebase モジュール版
 // ---------------------
-const toggleButton = document.getElementById("modeToggle");
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getDatabase, ref, push, onChildAdded } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
-toggleButton.addEventListener("click", () => {
-  document.body.classList.toggle("dark");
-  if(document.body.classList.contains("dark")){
-    localStorage.setItem("mode", "dark");
-  } else {
-    localStorage.setItem("mode", "light");
-  }
-});
-
-window.addEventListener("load", () => {
-  const savedMode = localStorage.getItem("mode");
-  if(savedMode === "dark"){
-    document.body.classList.add("dark");
-  }
-});
-
-// ---------------------
-// Firebase 初期化（自分の設定に置き換えてね）
-// ---------------------
+// Firebase 初期化
 const firebaseConfig = {
   apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
   authDomain: "chatapp-hassu.firebaseapp.com",
@@ -32,33 +15,54 @@ const firebaseConfig = {
   appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
 };
 
-firebase.initializeApp(firebaseConfig);
-const db = firebase.database();
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
 
 // ---------------------
-// 要素取得
+// HTML要素
 // ---------------------
-const chatContainer = document.getElementById("chatContainer");
-const messageInput = document.getElementById("messageInput");
 const sendBtn = document.getElementById("sendBtn");
+const messageInput = document.getElementById("messageInput");
+const chatContainer = document.getElementById("chatContainer");
+const toggleButton = document.getElementById("modeToggle");
+const body = document.body;
+
+// ---------------------
+// ダークモード切替
+// ---------------------
+toggleButton.addEventListener("click", () => {
+  body.classList.toggle("dark");
+  localStorage.setItem("mode", body.classList.contains("dark") ? "dark" : "light");
+});
+
+window.addEventListener("load", () => {
+  if(localStorage.getItem("mode") === "dark"){
+    body.classList.add("dark");
+  }
+});
 
 // ---------------------
 // メッセージ送信
 // ---------------------
-sendBtn.addEventListener("click", () => {
-  const text = messageInput.value.trim();
-  if(text === "") return;
+sendBtn.addEventListener("click", sendMessage);
+messageInput.addEventListener("keypress", e => { if(e.key === "Enter") sendMessage(); });
 
-  db.ref("messages").push({ text });
+function sendMessage() {
+  const text = messageInput.value.trim();
+  if(!text) return;
+
+  push(ref(db, "messages"), { text });
   messageInput.value = "";
-});
+}
 
 // ---------------------
 // メッセージ受信（リアルタイム）
-db.ref("messages").on("child_added", snapshot => {
+// ---------------------
+onChildAdded(ref(db, "messages"), snapshot => {
   const data = snapshot.val();
   const div = document.createElement("div");
   div.classList.add("message");
   div.textContent = data.text;
   chatContainer.appendChild(div);
+  chatContainer.scrollTop = chatContainer.scrollHeight;
 });
