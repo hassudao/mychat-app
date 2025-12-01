@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>MyChat ログイン / 登録</title>
+  <style>
+    body { font-family: sans-serif; text-align:center; padding: 50px; }
+    input { display:block; margin:10px auto; padding:8px; width:200px; }
+    button { margin:5px; padding:8px 16px; }
+  </style>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+<body>
+  <h2>MyChat ログイン / 登録</h2>
+
+  <input type="email" id="email" placeholder="メールアドレス">
+  <input type="password" id="password" placeholder="パスワード">
+  <button id="loginBtn">ログイン</button>
+  <button id="registerBtn">アカウント作成</button>
+
+  <script>
+    // Firebase設定
+    const firebaseConfig = {
+        apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
+        authDomain: "chatapp-hassu.firebaseapp.com",
+        databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "chatapp-hassu",
+        storageBucket: "chatapp-hassu.firebasestorage.app",
+        messagingSenderId: "8489684752",
+        appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
+    };
+
+    // Firebase初期化
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const database = firebase.database();
+
+    const loginBtn = document.getElementById("loginBtn");
+    const registerBtn = document.getElementById("registerBtn");
+
+    // ログイン
+    loginBtn.addEventListener("click", ()=>{
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      auth.signInWithEmailAndPassword(email, password)
+      .then(()=> location.href="chat.html")
+      .catch(err=> alert("ログイン失敗: "+err.message));
+    });
+
+    // アカウント作成
+    registerBtn.addEventListener("click", ()=>{
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      auth.createUserWithEmailAndPassword(email, password)
+      .then(()=> location.href="chat.html")
+      .catch(err=> alert("作成失敗: "+err.message));
+    });
+  </script>
+</body>
+</html>

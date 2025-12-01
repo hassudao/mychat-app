@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>MyChat チャット</title>
+  <style>
+    body { font-family:sans-serif; text-align:center; padding:20px; }
+    #messages { height:400px; overflow-y:scroll; border:1px solid #ccc; margin:10px auto; width:300px; padding:10px; text-align:left; }
+    #msgInput { width:200px; padding:5px; }
+    button { padding:5px 10px; }
+  </style>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+<body>
+  <h2>チャットルーム</h2>
+  <div id="messages"></div>
+  <input type="text" id="msgInput" placeholder="メッセージ入力…">
+  <button id="sendBtn">送信！</button>
+
+  <script>
+    // Firebase設定
+    const firebaseConfig = {
+        apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
+        authDomain: "chatapp-hassu.firebaseapp.com",
+        databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "chatapp-hassu",
+        storageBucket: "chatapp-hassu.firebasestorage.app",
+        messagingSenderId: "8489684752",
+        appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const database = firebase.database();
+
+    const messagesDiv = document.getElementById("messages");
+    const msgInput = document.getElementById("msgInput");
+    const sendBtn = document.getElementById("sendBtn");
+
+    // 送信
+    sendBtn.addEventListener("click", ()=>{
+      const user = auth.currentUser;
+      if(!user) return alert("ログインしてません");
+      const content = msgInput.value;
+      if(!content) return;
+      database.ref("messages").push({
+        username: user.email.split("@")[0],
+        content: content,
+        timestamp: Date.now()
+      });
+      msgInput.value = "";
+    });
+
+    // 受信（リアルタイム）
+    database.ref("messages").on("value", snapshot=>{
+      messagesDiv.innerHTML = "";
+      const data = snapshot.val();
+      if(data){
+        Object.values(data).sort((a,b)=>a.timestamp-b.timestamp).forEach(m=>{
+          messagesDiv.innerHTML += `<p><b>${m.username}</b>: ${m.content}</p>`;
+        });
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+    });
+
+    // 未ログイン時リダイレクト
+    auth.onAuthStateChanged(user=>{
+      if(!user) location.href = "index.html";
+    });
+  </script>
+</body>
+</html>
