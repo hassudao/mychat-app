@@ -2,15 +2,24 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>MyChat チャット</title>
+  <title>MyChat Discord風</title>
   <style>
     body { font-family:sans-serif; text-align:center; padding:20px; }
     body.dark { background-color:#1e1e1e; color:#f0f0f0; }
-    #messages { height:400px; overflow-y:scroll; border:1px solid #ccc; margin:10px auto; width:300px; padding:10px; text-align:left; }
-    .message { padding:4px 8px; border-radius:8px; margin-bottom:4px; background-color:#f0f0f0; }
-    body.dark .message { background-color:#333333; color:#ffffff; }
+
+    #messages { height:400px; overflow-y:scroll; border:1px solid #ccc; margin:10px auto; width:400px; padding:10px; text-align:left; }
+    .message { display:flex; align-items:flex-start; margin-bottom:6px; }
+    .avatar {
+      width:32px; height:32px; border-radius:50%; background:#666; color:#fff; display:flex;
+      align-items:center; justify-content:center; font-weight:bold; margin-right:8px; flex-shrink:0;
+    }
+    .content { background:#f0f0f0; padding:6px 10px; border-radius:12px; max-width:300px; word-wrap:break-word; }
+    body.dark .content { background:#333; color:#fff; }
+
     #msgInput { width:200px; padding:5px; }
     button { padding:5px 10px; margin:4px; }
+
+    #usernamePrompt { margin-bottom:10px; }
   </style>
 
   <!-- Firebase SDK -->
@@ -21,12 +30,31 @@
 <body>
   <h2>チャットルーム</h2>
   <button id="modeToggle">🌙 / ☀️ モード切替</button>
+  <div id="usernamePrompt">
+    <input type="text" id="usernameInput" placeholder="ユーザー名を入力">
+    <button id="setUsernameBtn">決定</button>
+  </div>
   <div id="messages"></div>
   <input type="text" id="msgInput" placeholder="メッセージ入力…">
   <button id="sendBtn">送信！</button>
 
   <script>
-    // Firebase設定
+    // -----------------------------
+    // ダークモード切替
+    // -----------------------------
+    const toggleButton = document.getElementById("modeToggle");
+    const body = document.body;
+    toggleButton.addEventListener("click", ()=>{
+      body.classList.toggle("dark");
+      localStorage.setItem("mode", body.classList.contains("dark") ? "dark" : "light");
+    });
+    window.addEventListener("load", ()=>{
+      if(localStorage.getItem("mode")==="dark") body.classList.add("dark");
+    });
+
+    // -----------------------------
+    // Firebase 初期化
+    // -----------------------------
     const firebaseConfig = {
       apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
       authDomain: "chatapp-hassu.firebaseapp.com",
@@ -36,60 +64,58 @@
       messagingSenderId: "8489684752",
       appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
     };
-
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const database = firebase.database();
 
+    // -----------------------------
+    // ユーザー名設定
+    // -----------------------------
+    let username = localStorage.getItem("username") || "";
+    const usernameInput = document.getElementById("usernameInput");
+    const setUsernameBtn = document.getElementById("setUsernameBtn");
+    const usernamePrompt = document.getElementById("usernamePrompt");
+
+    if(username){
+      usernamePrompt.style.display = "none";
+    }
+
+    setUsernameBtn.addEventListener("click", ()=>{
+      const val = usernameInput.value.trim();
+      if(!val) return alert("名前を入力してね");
+      username = val;
+      localStorage.setItem("username", username);
+      usernamePrompt.style.display = "none";
+    });
+
+    // -----------------------------
+    // HTML要素
+    // -----------------------------
     const messagesDiv = document.getElementById("messages");
     const msgInput = document.getElementById("msgInput");
     const sendBtn = document.getElementById("sendBtn");
-    const toggleButton = document.getElementById("modeToggle");
-    const body = document.body;
 
-    // -------------------------
-    // ダークモード切替
-    // -------------------------
-    toggleButton.addEventListener("click", ()=>{
-      body.classList.toggle("dark");
-      localStorage.setItem("mode", body.classList.contains("dark") ? "dark" : "light");
-    });
-
-    window.addEventListener("load", ()=>{
-      if(localStorage.getItem("mode") === "dark"){
-        body.classList.add("dark");
-      }
-    });
-
-    // -------------------------
-    // Firebase Auth: 未ログインはログインページに飛ばす
-    // -------------------------
-    auth.onAuthStateChanged(user=>{
-      if(!user) location.href = "index.html";
-    });
-
-    // -------------------------
-    // 送信処理
-    // -------------------------
+    // -----------------------------
+    // メッセージ送信
+    // -----------------------------
     sendBtn.addEventListener("click", sendMessage);
     msgInput.addEventListener("keypress", e=>{ if(e.key==="Enter") sendMessage(); });
 
     function sendMessage(){
-      const user = auth.currentUser;
-      if(!user) return alert("ログインしてません");
+      if(!username) return alert("まずユーザー名を設定してね");
       const content = msgInput.value.trim();
       if(!content) return;
       database.ref("messages").push({
-        username: user.email.split("@")[0],
+        username: username,
         content: content,
         timestamp: Date.now()
       });
       msgInput.value = "";
     }
 
-    // -------------------------
-    // 受信処理（リアルタイム）
-    // -------------------------
+    // -----------------------------
+    // メッセージ受信（リアルタイム）
+    // -----------------------------
     database.ref("messages").on("value", snapshot=>{
       messagesDiv.innerHTML = "";
       const data = snapshot.val();
@@ -97,7 +123,17 @@
         Object.values(data).sort((a,b)=>a.timestamp-b.timestamp).forEach(m=>{
           const div = document.createElement("div");
           div.classList.add("message");
-          div.innerHTML = `<b>${m.username}</b>: ${m.content}`;
+
+          const avatarDiv = document.createElement("div");
+          avatarDiv.classList.add("avatar");
+          avatarDiv.textContent = m.username[0].toUpperCase();
+          div.appendChild(avatarDiv);
+
+          const contentDiv = document.createElement("div");
+          contentDiv.classList.add("content");
+          contentDiv.textContent = m.username + ": " + m.content;
+          div.appendChild(contentDiv);
+
           messagesDiv.appendChild(div);
         });
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
