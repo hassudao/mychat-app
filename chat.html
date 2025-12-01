@@ -1,22 +1,76 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>チャット</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage.js"></script>
-  <script src="script.js" defer></script>
+  <meta charset="utf-8">
+  <title>MyChat チャット</title>
+  <style>
+    body { font-family:sans-serif; text-align:center; padding:20px; }
+    #messages { height:400px; overflow-y:scroll; border:1px solid #ccc; margin:10px auto; width:300px; padding:10px; text-align:left; }
+    #msgInput { width:200px; padding:5px; }
+    button { padding:5px 10px; }
+  </style>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
-  <div id="chat-container">
-    <div id="user-list"></div>
-    <div id="messages"></div>
-    <input type="text" id="message-input" placeholder="メッセージ">
-    <button id="send-btn">送信</button>
-    <button id="logout-btn">ログアウト</button>
-  </div>
+  <h2>チャットルーム</h2>
+  <div id="messages"></div>
+  <input type="text" id="msgInput" placeholder="メッセージ入力…">
+  <button id="sendBtn">送信！</button>
+
+  <script>
+    // Firebase設定
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT.firebaseapp.com",
+        databaseURL: "https://YOUR_PROJECT-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "YOUR_PROJECT",
+        storageBucket: "YOUR_PROJECT.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const database = firebase.database();
+
+    const messagesDiv = document.getElementById("messages");
+    const msgInput = document.getElementById("msgInput");
+    const sendBtn = document.getElementById("sendBtn");
+
+    // 送信
+    sendBtn.addEventListener("click", ()=>{
+      const user = auth.currentUser;
+      if(!user) return alert("ログインしてません");
+      const content = msgInput.value;
+      if(!content) return;
+      database.ref("messages").push({
+        username: user.email.split("@")[0],
+        content: content,
+        timestamp: Date.now()
+      });
+      msgInput.value = "";
+    });
+
+    // 受信（リアルタイム）
+    database.ref("messages").on("value", snapshot=>{
+      messagesDiv.innerHTML = "";
+      const data = snapshot.val();
+      if(data){
+        Object.values(data).sort((a,b)=>a.timestamp-b.timestamp).forEach(m=>{
+          messagesDiv.innerHTML += `<p><b>${m.username}</b>: ${m.content}</p>`;
+        });
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+      }
+    });
+
+    // 未ログイン時リダイレクト
+    auth.onAuthStateChanged(user=>{
+      if(!user) location.href = "index.html";
+    });
+  </script>
 </body>
 </html>
