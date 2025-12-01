@@ -5,10 +5,11 @@
   <title>ユーザー設定</title>
   <style>
     body { font-family:sans-serif; text-align:center; padding:20px; }
-    body.dark { background-color:#1e1e1e; color:#f0f0f0; }
     input, button { padding:6px 10px; margin:4px; }
     img { width:64px; height:64px; border-radius:50%; margin:6px; }
   </style>
+
+  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
@@ -44,11 +45,10 @@
     const saveBtn = document.getElementById("saveBtn");
     const preview = document.getElementById("preview");
 
-    // ログインチェック
     auth.onAuthStateChanged(user=>{
       if(!user) location.href = "index.html";
-      else if(user.displayName) usernameInput.value = user.displayName;
-      else if(user.photoURL) {
+      if(user.displayName) usernameInput.value = user.displayName;
+      if(user.photoURL){
         const img = document.createElement("img");
         img.src = user.photoURL;
         preview.appendChild(img);
@@ -69,18 +69,26 @@
       const user = auth.currentUser;
       const name = usernameInput.value.trim();
       if(!name) return alert("名前を入力してね");
-      
+
       let photoURL = user.photoURL || "";
+
       if(avatarInput.files[0]){
-        const file = avatarInput.files[0];
-        const storageRef = storage.ref().child("avatars/"+user.uid+"/"+file.name);
-        const snapshot = await storageRef.put(file);
-        photoURL = await snapshot.ref.getDownloadURL();
+        try{
+          const file = avatarInput.files[0];
+          const storageRef = storage.ref().child("avatars/"+user.uid+"/"+file.name);
+          const snapshot = await storageRef.put(file);
+          photoURL = await snapshot.ref.getDownloadURL();
+        } catch(e){
+          return alert("画像アップロード失敗: "+e.message);
+        }
       }
 
       user.updateProfile({ displayName: name, photoURL: photoURL })
-          .then(()=>alert("保存完了！"))
-          .catch(e=>alert(e.message));
+          .then(()=>{
+              alert("保存完了！");
+              location.href = "chat.html"; // 保存後にチャット画面へ戻る
+          })
+          .catch(e=>alert("保存失敗: "+e.message));
     });
   </script>
 </body>
