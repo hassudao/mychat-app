@@ -6,20 +6,13 @@
   <style>
     body { font-family:sans-serif; text-align:center; padding:20px; }
     body.dark { background-color:#1e1e1e; color:#f0f0f0; }
-
     #messages { height:400px; overflow-y:scroll; border:1px solid #ccc; margin:10px auto; width:400px; padding:10px; text-align:left; }
     .message { display:flex; align-items:flex-start; margin-bottom:6px; }
-    .avatar {
-      width:32px; height:32px; border-radius:50%; background:#666; color:#fff; display:flex;
-      align-items:center; justify-content:center; font-weight:bold; margin-right:8px; flex-shrink:0;
-    }
+    .avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; margin-right:8px; flex-shrink:0; }
     .content { background:#f0f0f0; padding:6px 10px; border-radius:12px; max-width:300px; word-wrap:break-word; }
     body.dark .content { background:#333; color:#fff; }
-
     #msgInput { width:200px; padding:5px; }
     button { padding:5px 10px; margin:4px; }
-
-    #usernamePrompt { margin-bottom:10px; }
   </style>
 
   <!-- Firebase SDK -->
@@ -30,10 +23,6 @@
 <body>
   <h2>チャットルーム</h2>
   <button id="modeToggle">🌙 / ☀️ モード切替</button>
-  <div id="usernamePrompt">
-    <input type="text" id="usernameInput" placeholder="ユーザー名を入力">
-    <button id="setUsernameBtn">決定</button>
-  </div>
   <div id="messages"></div>
   <input type="text" id="msgInput" placeholder="メッセージ入力…">
   <button id="sendBtn">送信！</button>
@@ -60,33 +49,13 @@
       authDomain: "chatapp-hassu.firebaseapp.com",
       databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
       projectId: "chatapp-hassu",
-      storageBucket: "chatapp-hassu.firebasestorage.app",
+      storageBucket: "chatapp-hassu.appspot.com",
       messagingSenderId: "8489684752",
       appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
     };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const database = firebase.database();
-
-    // -----------------------------
-    // ユーザー名設定
-    // -----------------------------
-    let username = localStorage.getItem("username") || "";
-    const usernameInput = document.getElementById("usernameInput");
-    const setUsernameBtn = document.getElementById("setUsernameBtn");
-    const usernamePrompt = document.getElementById("usernamePrompt");
-
-    if(username){
-      usernamePrompt.style.display = "none";
-    }
-
-    setUsernameBtn.addEventListener("click", ()=>{
-      const val = usernameInput.value.trim();
-      if(!val) return alert("名前を入力してね");
-      username = val;
-      localStorage.setItem("username", username);
-      usernamePrompt.style.display = "none";
-    });
 
     // -----------------------------
     // HTML要素
@@ -96,17 +65,26 @@
     const sendBtn = document.getElementById("sendBtn");
 
     // -----------------------------
+    // ログインチェック
+    // -----------------------------
+    auth.onAuthStateChanged(user=>{
+      if(!user) location.href = "index.html";
+    });
+
+    // -----------------------------
     // メッセージ送信
     // -----------------------------
     sendBtn.addEventListener("click", sendMessage);
     msgInput.addEventListener("keypress", e=>{ if(e.key==="Enter") sendMessage(); });
 
     function sendMessage(){
-      if(!username) return alert("まずユーザー名を設定してね");
+      const user = auth.currentUser;
+      if(!user) return alert("ログインしてません");
       const content = msgInput.value.trim();
       if(!content) return;
       database.ref("messages").push({
-        username: username,
+        username: user.displayName || "名無し",
+        photoURL: user.photoURL || "",
         content: content,
         timestamp: Date.now()
       });
@@ -126,14 +104,28 @@
 
           const avatarDiv = document.createElement("div");
           avatarDiv.classList.add("avatar");
-          avatarDiv.textContent = m.username[0].toUpperCase();
-          div.appendChild(avatarDiv);
+          if(m.photoURL){
+            const img = document.createElement("img");
+            img.src = m.photoURL;
+            img.style.width = "32px";
+            img.style.height = "32px";
+            img.style.borderRadius = "50%";
+            avatarDiv.appendChild(img);
+          } else {
+            avatarDiv.textContent = m.username[0].toUpperCase();
+            avatarDiv.style.backgroundColor = "#666";
+            avatarDiv.style.color = "#fff";
+            avatarDiv.style.display = "flex";
+            avatarDiv.style.alignItems = "center";
+            avatarDiv.style.justifyContent = "center";
+          }
 
           const contentDiv = document.createElement("div");
           contentDiv.classList.add("content");
           contentDiv.textContent = m.username + ": " + m.content;
-          div.appendChild(contentDiv);
 
+          div.appendChild(avatarDiv);
+          div.appendChild(contentDiv);
           messagesDiv.appendChild(div);
         });
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
