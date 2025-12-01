@@ -13,6 +13,7 @@
     body.dark .content { background:#333; color:#fff; }
     #msgInput { width:200px; padding:5px; }
     button { padding:5px 10px; margin:4px; }
+    #topButtons { margin-bottom:10px; }
   </style>
 
   <!-- Firebase SDK -->
@@ -22,7 +23,11 @@
 </head>
 <body>
   <h2>チャットルーム</h2>
-  <button id="modeToggle">🌙 / ☀️ モード切替</button>
+  <div id="topButtons">
+    <button id="modeToggle">🌙 / ☀️ モード切替</button>
+    <button id="settingsBtn">⚙️ 設定</button>
+  </div>
+
   <div id="messages"></div>
   <input type="text" id="msgInput" placeholder="メッセージ入力…">
   <button id="sendBtn">送信！</button>
@@ -40,6 +45,12 @@
     window.addEventListener("load", ()=>{
       if(localStorage.getItem("mode")==="dark") body.classList.add("dark");
     });
+
+    // -----------------------------
+    // 設定ボタン
+    // -----------------------------
+    const settingsBtn = document.getElementById("settingsBtn");
+    settingsBtn.addEventListener("click", ()=>location.href="settings.html");
 
     // -----------------------------
     // Firebase 初期化
@@ -133,4 +144,4 @@
     });
   </script>
 </body>
-</html>
+  </html>
