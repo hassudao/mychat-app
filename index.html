@@ -1,21 +1,64 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>ログイン</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js"></script>
-  <script src="script.js" defer></script>
+  <meta charset="utf-8">
+  <title>MyChat ログイン / 登録</title>
+  <style>
+    body { font-family: sans-serif; text-align:center; padding: 50px; }
+    input { display:block; margin:10px auto; padding:8px; width:200px; }
+    button { margin:5px; padding:8px 16px; }
+  </style>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
-  <div id="login-container">
-    <h1>チャットにログイン</h1>
-    <input type="email" id="email" placeholder="メール">
-    <input type="password" id="password" placeholder="パスワード">
-    <button id="login-btn">ログイン</button>
-    <button id="signup-btn">新規登録</button>
-    <button id="google-login-btn">Googleでログイン</button>
-  </div>
+  <h2>MyChat ログイン / 登録</h2>
+
+  <input type="email" id="email" placeholder="メールアドレス">
+  <input type="password" id="password" placeholder="パスワード">
+  <button id="loginBtn">ログイン</button>
+  <button id="registerBtn">アカウント作成</button>
+
+  <script>
+    // Firebase設定
+    const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT.firebaseapp.com",
+        databaseURL: "https://YOUR_PROJECT-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "YOUR_PROJECT",
+        storageBucket: "YOUR_PROJECT.appspot.com",
+        messagingSenderId: "YOUR_SENDER_ID",
+        appId: "YOUR_APP_ID"
+    };
+
+    // Firebase初期化
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const database = firebase.database();
+
+    const loginBtn = document.getElementById("loginBtn");
+    const registerBtn = document.getElementById("registerBtn");
+
+    // ログイン
+    loginBtn.addEventListener("click", ()=>{
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      auth.signInWithEmailAndPassword(email, password)
+      .then(()=> location.href="chat.html")
+      .catch(err=> alert("ログイン失敗: "+err.message));
+    });
+
+    // アカウント作成
+    registerBtn.addEventListener("click", ()=>{
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      auth.createUserWithEmailAndPassword(email, password)
+      .then(()=> location.href="chat.html")
+      .catch(err=> alert("作成失敗: "+err.message));
+    });
+  </script>
 </body>
 </html>
