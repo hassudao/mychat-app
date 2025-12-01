@@ -1,79 +1,64 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>ユーザー設定</title>
-  <style>
-    body { font-family:sans-serif; text-align:center; padding:20px; }
-    input, button { padding:6px 10px; margin:4px; }
-    img { width:64px; height:64px; border-radius:50%; margin:6px; }
-  </style>
-
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<meta charset="utf-8">
+<title>プロフィール設定</title>
+<style>
+body { font-family:sans-serif; padding:20px; }
+input { display:block; margin-bottom:10px; width:300px; padding:5px; }
+button { padding:5px 10px; }
+</style>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
-  <h2>ユーザー設定</h2>
-  <div>
-    <input type="text" id="usernameInput" placeholder="ユーザー名"><br>
-    <input type="text" id="avatarURLInput" placeholder="アイコン画像のURL"><br>
-    <button id="saveBtn">保存</button>
-  </div>
-  <div id="preview"></div>
+<h2>プロフィール設定</h2>
+<label>ユーザー名</label>
+<input type="text" id="nameInput">
+<label>アイコンURL</label>
+<input type="text" id="photoInput" placeholder="https://example.com/image.png">
+<button id="saveBtn">保存してチャットに戻る</button>
 
-  <script>
-    // Firebase 初期化
-    const firebaseConfig = {
-      apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
-      authDomain: "chatapp-hassu.firebaseapp.com",
-      databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "chatapp-hassu",
-      storageBucket: "chatapp-hassu.appspot.com",
-      messagingSenderId: "8489684752",
-      appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
+  authDomain: "chatapp-hassu.firebaseapp.com",
+  databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "chatapp-hassu",
+  storageBucket: "chatapp-hassu.appspot.com",
+  messagingSenderId: "8489684752",
+  appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const database = firebase.database();
 
-    const usernameInput = document.getElementById("usernameInput");
-    const avatarURLInput = document.getElementById("avatarURLInput");
-    const saveBtn = document.getElementById("saveBtn");
-    const preview = document.getElementById("preview");
+let currentUser=null;
+const nameInput=document.getElementById("nameInput");
+const photoInput=document.getElementById("photoInput");
+const saveBtn=document.getElementById("saveBtn");
 
-    auth.onAuthStateChanged(user=>{
-      if(!user) location.href="index.html";
-      if(user.displayName) usernameInput.value=user.displayName;
-      if(user.photoURL){
-        avatarURLInput.value=user.photoURL;
-        const img = document.createElement("img");
-        img.src=user.photoURL;
-        preview.appendChild(img);
-      }
-    });
+auth.onAuthStateChanged(user=>{
+  if(!user) location.href="index.html";
+  currentUser=user;
+  database.ref("users/"+user.uid).get().then(snap=>{
+    if(snap.exists()){
+      const u = snap.val();
+      nameInput.value = u.displayName || "";
+      photoInput.value = u.photoURL || "";
+    }
+  });
+});
 
-    avatarURLInput.addEventListener("input", ()=>{
-      preview.innerHTML="";
-      if(avatarURLInput.value.trim()!==""){
-        const img = document.createElement("img");
-        img.src=avatarURLInput.value.trim();
-        preview.appendChild(img);
-      }
-    });
-
-    saveBtn.addEventListener("click", ()=>{
-      const user = auth.currentUser;
-      const name=usernameInput.value.trim();
-      const url=avatarURLInput.value.trim();
-      if(!name) return alert("名前を入力してね");
-
-      user.updateProfile({ displayName:name, photoURL:url })
-          .then(()=>{
-            alert("保存完了！");
-            location.href="chat.html"; // 保存後にチャット画面へ自動遷移
-          })
-          .catch(e=>alert("保存失敗："+e.message));
-    });
-  </script>
+saveBtn.addEventListener("click", ()=>{
+  const displayName = nameInput.value.trim() || "名無し";
+  const photoURL = photoInput.value.trim();
+  database.ref("users/"+currentUser.uid).update({ displayName, photoURL }).then(()=>{
+    alert("プロフィールを更新しました！");
+    location.href="chat.html";
+  });
+});
+</script>
 </body>
 </html>
