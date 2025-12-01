@@ -55,9 +55,11 @@ document.getElementById("google-login-btn")?.addEventListener("click", ()=>{
     .catch(err=>alert(err.message));
 });
 
+if (location.pathname.endsWith("chat.html")) {
 // チャット画面
 onAuthStateChanged(auth, user=>{
   if(!user){ location.href="index.html"; return; }
+}
 
   // オンライン状態
   const userRef = ref(db, "users/" + user.uid + "/online");
