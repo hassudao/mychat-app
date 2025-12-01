@@ -1,0 +1,39 @@
+/* ライトモード（デフォルト） */
+body {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+/* ダークモード */
+body.dark {
+  background-color: #1e1e1e;
+  color: #f0f0f0;
+}
+
+/* メッセージ吹き出しの色切り替え */
+.message {
+  background-color: #f0f0f0;
+  color: #000000;
+  padding: 8px 12px;
+  border-radius: 12px;
+  margin-bottom: 6px;
+}
+
+body.dark .message {
+  background-color: #333333;
+  color: #ffffff;
+}
+
+/* チャット入力欄の色 */
+input[type="text"] {
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #ccc;
+  padding: 6px;
+}
+
+body.dark input[type="text"] {
+  background-color: #333333;
+  color: #ffffff;
+  border: 1px solid #555;
+}
