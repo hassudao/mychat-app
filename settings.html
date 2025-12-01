@@ -12,15 +12,12 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 </head>
 <body>
   <h2>ユーザー設定</h2>
   <div>
-    <input type="text" id="usernameInput" placeholder="ユーザー名">
-    <br>
-    <input type="file" id="avatarInput" accept="image/*">
-    <br>
+    <input type="text" id="usernameInput" placeholder="ユーザー名"><br>
+    <input type="text" id="avatarURLInput" placeholder="アイコン画像のURL"><br>
     <button id="saveBtn">保存</button>
   </div>
   <div id="preview"></div>
@@ -38,57 +35,44 @@
     };
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
-    const storage = firebase.storage();
 
     const usernameInput = document.getElementById("usernameInput");
-    const avatarInput = document.getElementById("avatarInput");
+    const avatarURLInput = document.getElementById("avatarURLInput");
     const saveBtn = document.getElementById("saveBtn");
     const preview = document.getElementById("preview");
 
     auth.onAuthStateChanged(user=>{
-      if(!user) location.href = "index.html";
-      if(user.displayName) usernameInput.value = user.displayName;
+      if(!user) location.href="index.html";
+      if(user.displayName) usernameInput.value=user.displayName;
       if(user.photoURL){
+        avatarURLInput.value=user.photoURL;
         const img = document.createElement("img");
-        img.src = user.photoURL;
+        img.src=user.photoURL;
         preview.appendChild(img);
       }
     });
 
-    avatarInput.addEventListener("change", ()=>{
-      preview.innerHTML = "";
-      const file = avatarInput.files[0];
-      if(file){
+    avatarURLInput.addEventListener("input", ()=>{
+      preview.innerHTML="";
+      if(avatarURLInput.value.trim()!==""){
         const img = document.createElement("img");
-        img.src = URL.createObjectURL(file);
+        img.src=avatarURLInput.value.trim();
         preview.appendChild(img);
       }
     });
 
-    saveBtn.addEventListener("click", async ()=>{
+    saveBtn.addEventListener("click", ()=>{
       const user = auth.currentUser;
-      const name = usernameInput.value.trim();
+      const name=usernameInput.value.trim();
+      const url=avatarURLInput.value.trim();
       if(!name) return alert("名前を入力してね");
 
-      let photoURL = user.photoURL || "";
-
-      if(avatarInput.files[0]){
-        try{
-          const file = avatarInput.files[0];
-          const storageRef = storage.ref().child("avatars/"+user.uid+"/"+file.name);
-          const snapshot = await storageRef.put(file);
-          photoURL = await snapshot.ref.getDownloadURL();
-        } catch(e){
-          return alert("画像アップロード失敗: "+e.message);
-        }
-      }
-
-      user.updateProfile({ displayName: name, photoURL: photoURL })
+      user.updateProfile({ displayName:name, photoURL:url })
           .then(()=>{
-              alert("保存完了！");
-              location.href = "chat.html"; // 保存後にチャット画面へ戻る
+            alert("保存完了！");
+            location.href="chat.html"; // 保存後にチャット画面へ自動遷移
           })
-          .catch(e=>alert("保存失敗: "+e.message));
+          .catch(e=>alert("保存失敗："+e.message));
     });
   </script>
 </body>
