@@ -1,189 +1,186 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>MyChat Discord風</title>
-  <style>
-    body { font-family:sans-serif; margin:0; display:flex; height:100vh; }
-    body.dark { background-color:#1e1e1e; color:#f0f0f0; }
-    #userList { width:150px; border-right:1px solid #ccc; overflow-y:auto; padding:10px; }
-    #chatContainer { flex:1; display:flex; flex-direction:column; padding:10px; }
-    #messages { flex:1; overflow-y:scroll; border:1px solid #ccc; padding:10px; margin-bottom:6px; }
-    .message { display:flex; align-items:flex-start; margin-bottom:6px; }
-    .avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; margin-right:8px; flex-shrink:0; }
-    .content { background:#f0f0f0; padding:6px 10px; border-radius:12px; max-width:300px; word-wrap:break-word; }
-    body.dark .content { background:#333; color:#fff; }
-    #inputArea { display:flex; }
-    #msgInput { flex:1; padding:5px; }
-    button { padding:5px 10px; margin-left:4px; }
-    .userItem { cursor:pointer; padding:4px; border-radius:4px; }
-    .userItem:hover { background:#ddd; }
-    body.dark .userItem:hover { background:#444; }
-    .activeUser { background:#aaa !important; }
-  </style>
-
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<meta charset="utf-8">
+<title>MyChat Discord風</title>
+<style>
+body { font-family:sans-serif; margin:0; display:flex; height:100vh; }
+body.dark { background-color:#1e1e1e; color:#f0f0f0; }
+#userList { width:150px; border-right:1px solid #ccc; overflow-y:auto; padding:10px; }
+#chatContainer { flex:1; display:flex; flex-direction:column; padding:10px; }
+#messages { flex:1; overflow-y:scroll; border:1px solid #ccc; padding:10px; margin-bottom:6px; display:flex; flex-direction:column; }
+.message { display:flex; align-items:flex-start; margin-bottom:6px; }
+.avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; margin-right:8px; flex-shrink:0; }
+.content { background:#f0f0f0; padding:6px 10px; border-radius:12px; max-width:300px; word-wrap:break-word; }
+.myMessage { justify-content:flex-end; }
+.myMessage .content { background:#007bff; color:#fff; }
+.otherMessage { justify-content:flex-start; }
+body.dark .content { background:#333; color:#fff; }
+#inputArea { display:flex; }
+#msgInput { flex:1; padding:5px; }
+button { padding:5px 10px; margin-left:4px; }
+.userItem { cursor:pointer; padding:4px; border-radius:4px; }
+.userItem:hover { background:#ddd; }
+body.dark .userItem:hover { background:#444; }
+.activeUser { background:#aaa !important; }
+</style>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
-  <div id="userList">
-    <h4>ユーザー一覧</h4>
-    <div id="users"></div>
+<div id="userList">
+  <h4>ユーザー一覧</h4>
+  <div id="users"></div>
+</div>
+<div id="chatContainer">
+  <div>
+    <button id="modeToggle">🌙 / ☀️ モード切替</button>
+    <button id="settingsBtn">⚙️ 設定</button>
   </div>
-  <div id="chatContainer">
-    <div>
-      <button id="modeToggle">🌙 / ☀️ モード切替</button>
-      <button id="settingsBtn">⚙️ 設定</button>
-    </div>
-    <div id="messages"></div>
-    <div id="inputArea">
-      <input type="text" id="msgInput" placeholder="メッセージ入力…">
-      <button id="sendBtn">送信！</button>
-    </div>
+  <div id="messages"></div>
+  <div id="inputArea">
+    <input type="text" id="msgInput" placeholder="メッセージ入力…">
+    <button id="sendBtn">送信！</button>
   </div>
+</div>
 
-  <script>
-    // Firebase 初期化
-    const firebaseConfig = {
-      apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
-      authDomain: "chatapp-hassu.firebaseapp.com",
-      databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "chatapp-hassu",
-      storageBucket: "chatapp-hassu.appspot.com",
-      messagingSenderId: "8489684752",
-      appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const database = firebase.database();
+<script>
+// Firebase 初期化
+const firebaseConfig = {
+  apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
+  authDomain: "chatapp-hassu.firebaseapp.com",
+  databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "chatapp-hassu",
+  storageBucket: "chatapp-hassu.appspot.com",
+  messagingSenderId: "8489684752",
+  appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const database = firebase.database();
 
-    // -----------------------------
-    // ダークモード切替
-    // -----------------------------
-    const toggleButton = document.getElementById("modeToggle");
-    const bodyEl = document.body;
-    toggleButton.addEventListener("click", ()=>{
-      bodyEl.classList.toggle("dark");
-      localStorage.setItem("mode", bodyEl.classList.contains("dark") ? "dark" : "light");
-    });
-    window.addEventListener("load", ()=>{
-      if(localStorage.getItem("mode")==="dark") bodyEl.classList.add("dark");
-    });
+// ----------------- ダークモード -----------------
+const toggleButton = document.getElementById("modeToggle");
+const bodyEl = document.body;
+toggleButton.addEventListener("click", ()=>{
+  bodyEl.classList.toggle("dark");
+  localStorage.setItem("mode", bodyEl.classList.contains("dark") ? "dark" : "light");
+});
+window.addEventListener("load", ()=>{
+  if(localStorage.getItem("mode")==="dark") bodyEl.classList.add("dark");
+});
 
-    // -----------------------------
-    // 設定ボタン
-    // -----------------------------
-    document.getElementById("settingsBtn").addEventListener("click", ()=>location.href="settings.html");
+// ----------------- 設定 -----------------
+document.getElementById("settingsBtn").addEventListener("click", ()=>location.href="settings.html");
 
-    // -----------------------------
-    // ログインチェック
-    // -----------------------------
-    let currentUser=null;
-    auth.onAuthStateChanged(user=>{
-      if(!user) location.href="index.html";
-      currentUser=user;
-      // ユーザー情報をDBに保存
-      database.ref("users/"+user.uid).set({
-        displayName: user.displayName || "名無し",
-        photoURL: user.photoURL || ""
+// ----------------- ログインチェック -----------------
+let currentUser=null;
+auth.onAuthStateChanged(user=>{
+  if(!user) location.href="index.html";
+  currentUser=user;
+  // ユーザー情報をDBに保存
+  database.ref("users/"+user.uid).set({
+    displayName: user.displayName || "名無し",
+    photoURL: user.photoURL || ""
+  });
+  loadUsers();
+});
+
+// ----------------- ユーザーリスト -----------------
+const usersDiv = document.getElementById("users");
+let selectedUserId=null;
+function loadUsers(){
+  database.ref("users").on("value", snapshot=>{
+    usersDiv.innerHTML="";
+    const data=snapshot.val();
+    if(data){
+      Object.entries(data).forEach(([uid,user])=>{
+        if(uid===currentUser.uid) return;
+        const div=document.createElement("div");
+        div.textContent=user.displayName;
+        div.classList.add("userItem");
+        div.dataset.uid=uid;
+        div.addEventListener("click", ()=>{
+          selectUser(uid, user.displayName);
+          document.querySelectorAll(".userItem").forEach(el=>el.classList.remove("activeUser"));
+          div.classList.add("activeUser");
+        });
+        usersDiv.appendChild(div);
       });
-      loadUsers();
-    });
+    }
+  });
+}
 
-    // -----------------------------
-    // ユーザーリスト取得
-    // -----------------------------
-    const usersDiv = document.getElementById("users");
-    let selectedUserId=null;
-    function loadUsers(){
-      database.ref("users").on("value", snapshot=>{
-        usersDiv.innerHTML="";
-        const data=snapshot.val();
-        if(data){
-          Object.entries(data).forEach(([uid,user])=>{
-            if(uid===currentUser.uid) return;
-            const div=document.createElement("div");
-            div.textContent=user.displayName;
-            div.classList.add("userItem");
-            div.dataset.uid=uid;
-            div.addEventListener("click", ()=>{
-              selectUser(uid, user.displayName);
-              document.querySelectorAll(".userItem").forEach(el=>el.classList.remove("activeUser"));
-              div.classList.add("activeUser");
-            });
-            usersDiv.appendChild(div);
-          });
+// ----------------- DM選択 -----------------
+const messagesDiv=document.getElementById("messages");
+function selectUser(uid,name){
+  selectedUserId=uid;
+  messagesDiv.innerHTML="";
+  const roomId=[currentUser.uid,uid].sort().join("_");
+  database.ref("dm/"+roomId+"/messages").on("value", snapshot=>{
+    messagesDiv.innerHTML="";
+    const data=snapshot.val();
+    if(data){
+      Object.values(data).sort((a,b)=>a.timestamp-b.timestamp).forEach(m=>{
+        const div=document.createElement("div");
+        div.classList.add("message");
+        if(m.username===currentUser.displayName){
+          div.classList.add("myMessage");
+        }else{
+          div.classList.add("otherMessage");
         }
-      });
-    }
 
-    // -----------------------------
-    // DMルーム選択
-    // -----------------------------
-    const messagesDiv=document.getElementById("messages");
-    function selectUser(uid,name){
-      selectedUserId=uid;
-      messagesDiv.innerHTML="";
-      const roomId=[currentUser.uid,uid].sort().join("_");
-      database.ref("dm/"+roomId+"/messages").on("value", snapshot=>{
-        messagesDiv.innerHTML="";
-        const data=snapshot.val();
-        if(data){
-          Object.values(data).sort((a,b)=>a.timestamp-b.timestamp).forEach(m=>{
-            const div=document.createElement("div");
-            div.classList.add("message");
-            const avatarDiv=document.createElement("div");
-            avatarDiv.classList.add("avatar");
-            if(m.photoURL){
-              const img=document.createElement("img");
-              img.src=m.photoURL;
-              img.style.width="32px";
-              img.style.height="32px";
-              img.style.borderRadius="50%";
-              avatarDiv.appendChild(img);
-            }else{
-              avatarDiv.textContent=m.username[0].toUpperCase();
-              avatarDiv.style.backgroundColor="#666";
-              avatarDiv.style.color="#fff";
-              avatarDiv.style.display="flex";
-              avatarDiv.style.alignItems="center";
-              avatarDiv.style.justifyContent="center";
-            }
-            const contentDiv=document.createElement("div");
-            contentDiv.classList.add("content");
-            contentDiv.textContent=m.username+": "+m.content;
-            div.appendChild(avatarDiv);
-            div.appendChild(contentDiv);
-            messagesDiv.appendChild(div);
-          });
-          messagesDiv.scrollTop=messagesDiv.scrollHeight;
+        const avatarDiv=document.createElement("div");
+        avatarDiv.classList.add("avatar");
+        if(m.photoURL){
+          const img=document.createElement("img");
+          img.src=m.photoURL;
+          img.style.width="32px";
+          img.style.height="32px";
+          img.style.borderRadius="50%";
+          avatarDiv.appendChild(img);
+        }else{
+          avatarDiv.textContent=m.username[0].toUpperCase();
+          avatarDiv.style.backgroundColor="#666";
+          avatarDiv.style.color="#fff";
+          avatarDiv.style.display="flex";
+          avatarDiv.style.alignItems="center";
+          avatarDiv.style.justifyContent="center";
         }
+
+        const contentDiv=document.createElement("div");
+        contentDiv.classList.add("content");
+        contentDiv.textContent=m.content;
+
+        div.appendChild(avatarDiv);
+        div.appendChild(contentDiv);
+        messagesDiv.appendChild(div);
       });
+      messagesDiv.scrollTop=messagesDiv.scrollHeight;
     }
+  });
+}
 
-    // -----------------------------
-    // メッセージ送信
-    // -----------------------------
-    const msgInput=document.getElementById("msgInput");
-    const sendBtn=document.getElementById("sendBtn");
-    sendBtn.addEventListener("click", sendMessage);
-    msgInput.addEventListener("keypress", e=>{ if(e.key==="Enter") sendMessage(); });
+// ----------------- メッセージ送信 -----------------
+const msgInput=document.getElementById("msgInput");
+const sendBtn=document.getElementById("sendBtn");
+sendBtn.addEventListener("click", sendMessage);
+msgInput.addEventListener("keypress", e=>{ if(e.key==="Enter") sendMessage(); });
 
-    function sendMessage(){
-      if(!selectedUserId) return alert("ユーザーを選択してください");
-      const content=msgInput.value.trim();
-      if(!content) return;
-      const roomId=[currentUser.uid,selectedUserId].sort().join("_");
-      database.ref("dm/"+roomId+"/messages").push({
-        username: currentUser.displayName || "名無し",
-        photoURL: currentUser.photoURL || "",
-        content: content,
-        timestamp: Date.now()
-      });
-      msgInput.value="";
-    }
-
-  </script>
+function sendMessage(){
+  if(!selectedUserId) return alert("ユーザーを選択してください");
+  const content=msgInput.value.trim();
+  if(!content) return;
+  const roomId=[currentUser.uid,selectedUserId].sort().join("_");
+  database.ref("dm/"+roomId+"/messages").push({
+    username: currentUser.displayName || "名無し",
+    photoURL: currentUser.photoURL || "",
+    content: content,
+    timestamp: Date.now()
+  });
+  msgInput.value="";
+}
+</script>
 </body>
 </html>
