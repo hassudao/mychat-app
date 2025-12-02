@@ -16,7 +16,6 @@
     .followBtn { padding:5px 8px; cursor:pointer; }
   </style>
 
-  <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
@@ -88,7 +87,7 @@
                 id: opponentId,
                 lastMessage: data[opponentId].lastMessage,
                 displayName: userData.displayName || opponentId,
-                icon: userData.icon || "https://via.placeholder.com/40",
+                photoURL: userData.photoURL || "https://via.placeholder.com/40",
                 followers: userData.followers || []
               });
             })
@@ -105,32 +104,28 @@
         const div = document.createElement("div");
         div.className="chatItem";
 
-        // アイコン＋名前
         const infoDiv = document.createElement("div");
         infoDiv.className="chatInfo";
         const img = document.createElement("img");
-        img.src = chat.icon || "https://via.placeholder.com/40";
+        img.src = chat.photoURL;
         infoDiv.appendChild(img);
 
         const text = document.createTextNode(`${chat.displayName} : ${chat.lastMessage||""}`);
         infoDiv.appendChild(text);
         div.appendChild(infoDiv);
 
-        // フォローボタン
         const followBtn = document.createElement("button");
         followBtn.className = "followBtn";
         followBtn.textContent = chat.followers.includes(currentUser.uid) ? "フォロー中" : "フォロー";
         followBtn.onclick = (e)=>{
-          e.stopPropagation(); // チャット開くのに干渉させない
+          e.stopPropagation();
           const userRef = database.ref("users/"+chat.id+"/followers");
           userRef.once("value").then(snap=>{
             let arr = snap.val() || [];
             if(arr.includes(currentUser.uid)){
-              // フォロー解除
               arr = arr.filter(uid=>uid!==currentUser.uid);
               followBtn.textContent = "フォロー";
             } else {
-              // フォロー追加
               arr.push(currentUser.uid);
               followBtn.textContent = "フォロー中";
             }
@@ -145,7 +140,6 @@
       });
     }
 
-    // ユーザー検索
     searchBar.addEventListener("input", ()=>{
       const kw = searchBar.value.trim().toLowerCase();
       if(!kw){ startChatListListener(); return; }
@@ -162,7 +156,7 @@
             results.push({
               id: uid,
               displayName: u.displayName,
-              icon: u.icon || "https://via.placeholder.com/40",
+              photoURL: u.photoURL || "https://via.placeholder.com/40",
               followers: u.followers || []
             });
           }
@@ -171,7 +165,6 @@
       });
     });
 
-    // 通知センター（Firestore）
     function loadNotifications(){
       firestore.collection("notifications").doc(currentUser.uid).collection("list")
       .onSnapshot(snapshot=>{
