@@ -1,333 +1,74 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8">
-<title>MyChat 時刻対応版</title>
-<style>
-body { font-family:sans-serif; margin:0; display:flex; height:100vh; }
-body.dark { background-color:#1e1e1e; color:#f0f0f0; }
-#userList { width:180px; border-right:1px solid #ccc; overflow-y:auto; padding:10px; }
-#chatContainer { flex:1; display:flex; flex-direction:column; padding:10px; }
-#messages { flex:1; overflow-y:scroll; border:1px solid #ccc; padding:10px; margin-bottom:6px; display:flex; flex-direction:column; }
-.message { display:flex; align-items:flex-start; margin-bottom:6px; }
-.avatar { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; flex-shrink:0; }
-.content { background:#f0f0f0; padding:6px 10px; border-radius:12px; max-width:300px; word-wrap:break-word; position:relative; }
-.myMessage { justify-content:flex-end; }
-.myMessage .content { background:#007bff; color:#fff; margin-left:8px; }
-.myMessage .avatar { order:2; margin-left:8px; margin-right:0; }
-.otherMessage { justify-content:flex-start; }
-.otherMessage .content { margin-right:8px; }
-body.dark .content { background:#333; color:#fff; }
-.timestamp { font-size:10px; color:#666; text-align:right; margin-top:2px; }
-body.dark .timestamp { color:#aaa; }
-#inputArea { display:flex; }
-#msgInput { flex:1; padding:5px; }
-button { padding:5px 10px; margin-left:4px; }
-.userItem { cursor:pointer; padding:4px; border-radius:4px; display:flex; justify-content:space-between; align-items:center; }
-.userItem:hover { background:#ddd; }
-body.dark .userItem:hover { background:#444; }
-.activeUser { background:#aaa !important; }
-#friendSearch { width:100%; padding:4px; margin-bottom:4px; box-sizing:border-box; }
-#searchResults { max-height:150px; overflow-y:auto; border:1px solid #ccc; padding:4px; margin-bottom:6px; }
-#notifBtn { position:absolute; right:20px; top:10px; padding:6px 12px; cursor:pointer; }
-#notifPanel { position:absolute; right:20px; top:50px; width:250px; max-height:400px; overflow-y:auto; background:#fff; border:1px solid #ccc; display:none; z-index:1000; }
-body.dark #notifPanel { background:#333; color:#fff; border-color:#555; }
-.notifItem { border-bottom:1px solid #ccc; padding:4px; display:flex; justify-content:space-between; align-items:center; flex-direction:column; }
-body.dark .notifItem { border-color:#555; }
-.notifUnread { background:#def; }
-body.dark .notifUnread { background:#555; }
-.notifTime { font-size:10px; color:#666; }
-body.dark .notifTime { color:#aaa; }
-</style>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <meta charset="utf-8">
+  <title>MyChat - トークリスト</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    #chatList { max-width: 400px; margin: auto; }
+    .chatItem { border:1px solid #ccc; padding:10px; margin-bottom:5px; cursor:pointer; }
+  </style>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getFirestore, collection, getDocs, getDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
+      authDomain: "chatapp-hassu.firebaseapp.com",
+      databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "chatapp-hassu",
+      storageBucket: "chatapp-hassu.appspot.com",
+      messagingSenderId: "8489684752",
+      appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    const chatListDiv = document.getElementById("chatList");
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        location.href = "index.html";
+        return;
+      }
+      const chatList = await fetchChatList(user.uid);
+      chatListDiv.innerHTML = "";
+      chatList.forEach(chat => {
+        const div = document.createElement("div");
+        div.className = "chatItem";
+        div.textContent = chat.id + " : " + chat.lastMessage;
+        div.onclick = () => { location.href = `dm.html?opponentId=${chat.id}`; };
+        chatListDiv.appendChild(div);
+      });
+    });
+
+    async function fetchChatList(currentUserId){
+      const chatListRef = collection(db, "chats", currentUserId, "list");
+      const chatListSnap = await getDocs(chatListRef);
+      const list = [];
+
+      for(const docSnap of chatListSnap.docs){
+        const opponentId = docSnap.id;
+        const userRef = doc(db, "users", opponentId);
+        const userSnap = await getDoc(userRef);
+
+        if(!userSnap.exists() || userSnap.data().active === false){
+          await deleteDoc(doc(chatListRef, opponentId));
+          continue;
+        }
+
+        list.push({ id: opponentId, ...docSnap.data() });
+      }
+      return list;
+    }
+  </script>
 </head>
 <body>
-<div id="userList">
-  <h4>フォロー中</h4>
-  <div id="users"></div>
-  <input type="text" id="friendSearch" placeholder="ID・メール・名前で検索">
-  <div id="searchResults"></div>
-</div>
-<div id="chatContainer">
-  <div>
-    <button id="modeToggle">🌙 / ☀️ モード切替</button>
-    <button id="settingsBtn">⚙️ 設定</button>
-    <button id="notifBtn">🔔</button>
-    <div id="notifPanel"></div>
-  </div>
-  <div id="messages"></div>
-  <div id="inputArea">
-    <input type="text" id="msgInput" placeholder="メッセージ入力…">
-    <button id="sendBtn">送信！</button>
-  </div>
-</div>
-
-<script>
-// Firebase 初期化
-const firebaseConfig = {
-  apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
-  authDomain: "chatapp-hassu.firebaseapp.com",
-  databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "chatapp-hassu",
-  storageBucket: "chatapp-hassu.appspot.com",
-  messagingSenderId: "8489684752",
-  appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
-};
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const database = firebase.database();
-
-// ----------------- ダークモード -----------------
-const toggleButton = document.getElementById("modeToggle");
-const bodyEl = document.body;
-toggleButton.addEventListener("click", ()=>{
-  bodyEl.classList.toggle("dark");
-  localStorage.setItem("mode", bodyEl.classList.contains("dark") ? "dark" : "light");
-});
-window.addEventListener("load", ()=>{
-  if(localStorage.getItem("mode")==="dark") bodyEl.classList.add("dark");
-});
-
-// ----------------- 設定 -----------------
-document.getElementById("settingsBtn").addEventListener("click", ()=>location.href="settings.html");
-
-// ----------------- ログインチェック -----------------
-let currentUser=null;
-auth.onAuthStateChanged(user=>{
-  if(!user) location.href="index.html";
-  currentUser=user;
-  database.ref("users/"+user.uid).set({
-    displayName: user.displayName || "名無し",
-    photoURL: user.photoURL || "",
-    email: user.email || ""
-  });
-  loadFollowedUsers();
-  loadNotifications();
-});
-
-// ----------------- フォロー中ユーザー表示 -----------------
-const usersDiv = document.getElementById("users");
-let selectedUserId=null;
-function loadFollowedUsers(){
-  database.ref("follows/"+currentUser.uid).on("value", snapshot=>{
-    usersDiv.innerHTML="";
-    const data=snapshot.val();
-    if(data){
-      Object.keys(data).forEach(uid=>{
-        database.ref("users/"+uid).get().then(snap=>{
-          if(snap.exists()){
-            const user=snap.val();
-            const div=document.createElement("div");
-            div.textContent=user.displayName;
-            div.classList.add("userItem");
-            div.dataset.uid=uid;
-            div.addEventListener("click", ()=>{
-              selectUser(uid, user.displayName);
-              document.querySelectorAll(".userItem").forEach(el=>el.classList.remove("activeUser"));
-              div.classList.add("activeUser");
-            });
-            usersDiv.appendChild(div);
-          }
-        });
-      });
-    }
-  });
-}
-
-// ----------------- 検索 + フォロー -----------------
-const searchInput=document.getElementById("friendSearch");
-const searchResults=document.getElementById("searchResults");
-searchInput.addEventListener("input", ()=>{
-  const keyword = searchInput.value.trim().toLowerCase();
-  if(!keyword){ searchResults.innerHTML=""; return; }
-  database.ref("users").once("value").then(snapshot=>{
-    const data=snapshot.val();
-    const results=[];
-    Object.entries(data).forEach(([uid,user])=>{
-      if(uid===currentUser.uid) return;
-      if(uid.toLowerCase().includes(keyword) ||
-         (user.email && user.email.toLowerCase().includes(keyword)) ||
-         (user.displayName && user.displayName.toLowerCase().includes(keyword))){
-        results.push({uid, ...user});
-      }
-    });
-    showSearchResults(results);
-  });
-});
-
-function showSearchResults(results){
-  searchResults.innerHTML="";
-  results.forEach(user=>{
-    const div=document.createElement("div");
-    div.classList.add("userItem");
-    const avatarDiv=document.createElement("div");
-    avatarDiv.classList.add("avatar");
-    if(user.photoURL){
-      const img=document.createElement("img");
-      img.src=user.photoURL;
-      img.style.width="32px";
-      img.style.height="32px";
-      img.style.borderRadius="50%";
-      avatarDiv.appendChild(img);
-    } else {
-      avatarDiv.textContent=user.displayName[0].toUpperCase();
-      avatarDiv.style.backgroundColor="#666";
-      avatarDiv.style.color="#fff";
-      avatarDiv.style.display="flex";
-      avatarDiv.style.alignItems="center";
-      avatarDiv.style.justifyContent="center";
-    }
-    div.appendChild(avatarDiv);
-    const nameDiv=document.createElement("span");
-    nameDiv.textContent = user.displayName+" ("+user.email+")";
-    div.appendChild(nameDiv);
-
-    const followBtn=document.createElement("button");
-    followBtn.textContent="フォロー";
-    followBtn.addEventListener("click", ()=>{
-      database.ref("follows/"+currentUser.uid+"/"+user.uid).set(true);
-      database.ref("notifications/"+user.uid).push({
-        type: "follow",
-        fromUid: currentUser.uid,
-        fromName: currentUser.displayName || "名無し",
-        timestamp: Date.now(),
-        read: false
-      });
-      alert("フォローしました！");
-      div.remove();
-    });
-    div.appendChild(followBtn);
-    searchResults.appendChild(div);
-  });
-}
-
-// ----------------- DM選択 -----------------
-const messagesDiv=document.getElementById("messages");
-function selectUser(uid,name){
-  selectedUserId=null;
-  database.ref("follows/"+uid+"/"+currentUser.uid).get().then(snap=>{
-    if(snap.exists()){
-      selectedUserId=uid;
-      messagesDiv.innerHTML="";
-      const roomId=[currentUser.uid,uid].sort().join("_");
-      database.ref("dm/"+roomId+"/messages").on("value", snapshot=>{
-        messagesDiv.innerHTML="";
-        const data=snapshot.val();
-        if(data){
-          Object.values(data).sort((a,b)=>a.timestamp-b.timestamp).forEach(m=>{
-            const div=document.createElement("div");
-            div.classList.add("message");
-            if(m.username===currentUser.displayName){
-              div.classList.add("myMessage");
-            }else{
-              div.classList.add("otherMessage");
-            }
-            const avatarDiv=document.createElement("div");
-            avatarDiv.classList.add("avatar");
-            if(m.photoURL){
-              const img=document.createElement("img");
-              img.src=m.photoURL;
-              img.style.width="32px";
-              img.style.height="32px";
-              img.style.borderRadius="50%";
-              avatarDiv.appendChild(img);
-            }else{
-              avatarDiv.textContent=m.username[0].toUpperCase();
-              avatarDiv.style.backgroundColor="#666";
-              avatarDiv.style.color="#fff";
-              avatarDiv.style.display="flex";
-              avatarDiv.style.alignItems="center";
-              avatarDiv.style.justifyContent="center";
-            }
-            const contentDiv=document.createElement("div");
-            contentDiv.classList.add("content");
-            contentDiv.innerHTML = m.content + `<div class="timestamp">${new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</div>`;
-            div.appendChild(avatarDiv);
-            div.appendChild(contentDiv);
-            messagesDiv.appendChild(div);
-          });
-          messagesDiv.scrollTop=messagesDiv.scrollHeight;
-        }
-      });
-    } else {
-      alert("相互フォローしているユーザーのみDM可能です！");
-    }
-  });
-}
-
-// ----------------- メッセージ送信 -----------------
-const msgInput=document.getElementById("msgInput");
-const sendBtn=document.getElementById("sendBtn");
-sendBtn.addEventListener("click", sendMessage);
-msgInput.addEventListener("keypress", e=>{ if(e.key==="Enter") sendMessage(); });
-
-function sendMessage(){
-  if(!selectedUserId) return alert("DM可能なユーザーを選択してください");
-  const content=msgInput.value.trim();
-  if(!content) return;
-  const roomId=[currentUser.uid,selectedUserId].sort().join("_");
-  database.ref("dm/"+roomId+"/messages").push({
-    username: currentUser.displayName || "名無し",
-    photoURL: currentUser.photoURL || "",
-    content: content,
-    timestamp: Date.now()
-  });
-  msgInput.value="";
-}
-
-// ----------------- 通知センター -----------------
-const notifBtn=document.getElementById("notifBtn");
-const notifPanel=document.getElementById("notifPanel");
-notifBtn.addEventListener("click", ()=>{ notifPanel.style.display = notifPanel.style.display==="none"?"block":"none"; });
-
-function loadNotifications(){
-  database.ref("notifications/"+currentUser.uid).on("value", snapshot=>{
-    const data = snapshot.val();
-    updateNotifBadge(data);
-    notifPanel.innerHTML="";
-    if(data){
-      Object.entries(data).sort((a,b)=>b[1].timestamp-a[1].timestamp).forEach(([id,notif])=>{
-        const div=document.createElement("div");
-        div.classList.add("notifItem");
-        if(!notif.read) div.classList.add("notifUnread");
-
-        const timeDiv=document.createElement("div");
-        timeDiv.classList.add("notifTime");
-        timeDiv.textContent = new Date(notif.timestamp).toLocaleString([], {hour:'2-digit', minute:'2-digit', month:'numeric', day:'numeric'});
-
-        if(notif.type==="follow"){
-          div.textContent = notif.fromName + " さんがフォローしました";
-          const backBtn=document.createElement("button");
-          backBtn.textContent="フォローバック";
-          backBtn.addEventListener("click", ()=>{
-            database.ref("follows/"+currentUser.uid+"/"+notif.fromUid).set(true);
-            database.ref("notifications/"+currentUser.uid+"/"+id+"/read").set(true);
-            div.remove();
-          });
-          div.appendChild(backBtn);
-        } else if(notif.type==="follow_back"){
-          div.textContent = notif.fromName + " さんがフォローバックしました";
-          const okBtn=document.createElement("button");
-          okBtn.textContent="確認";
-          okBtn.addEventListener("click", ()=>{
-            database.ref("notifications/"+currentUser.uid+"/"+id+"/read").set(true);
-            div.remove();
-          });
-          div.appendChild(okBtn);
-        }
-        div.appendChild(timeDiv);
-        notifPanel.appendChild(div);
-      });
-    }
-  });
-}
-
-function updateNotifBadge(notifs){
-  const unread = Object.values(notifs||{}).filter(n=>!n.read).length;
-  notifBtn.textContent = unread > 0 ? `🔔 (${unread})` : "🔔";
-}
-</script>
+  <h2>チャット一覧</h2>
+  <div id="chatList"></div>
 </body>
-  </html>
+</html>
