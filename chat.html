@@ -1,74 +1,94 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>MyChat - トークリスト</title>
-  <style>
-    body { font-family: sans-serif; padding: 20px; }
-    #chatList { max-width: 400px; margin: auto; }
-    .chatItem { border:1px solid #ccc; padding:10px; margin-bottom:5px; cursor:pointer; }
-  </style>
+<meta charset="utf-8">
+<title>MyChat - トークリスト</title>
+<style>
+  body { font-family:sans-serif; padding:20px; transition: background 0.3s, color 0.3s; }
+  body.dark { background:#121212; color:white; }
+  #chatList { max-width: 400px; margin: auto; }
+  .chatItem { border:1px solid #ccc; padding:10px; margin-bottom:5px; cursor:pointer; border-radius:5px; }
+  .dark .chatItem { border-color:#555; }
+  #searchBar { width:100%; max-width:400px; padding:5px; margin-bottom:10px; }
+  #darkToggle { margin-bottom:10px; padding:5px 10px; cursor:pointer; }
+</style>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, getDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getFirestore, collection, getDocs, getDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
-      authDomain: "chatapp-hassu.firebaseapp.com",
-      databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "chatapp-hassu",
-      storageBucket: "chatapp-hassu.appspot.com",
-      messagingSenderId: "8489684752",
-      appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
-    };
+const firebaseConfig = {
+  apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
+  authDomain: "chatapp-hassu.firebaseapp.com",
+  databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "chatapp-hassu",
+  storageBucket: "chatapp-hassu.appspot.com",
+  messagingSenderId: "8489684752",
+  appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
+};
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
 
-    const chatListDiv = document.getElementById("chatList");
+const chatListDiv = document.getElementById("chatList");
+const searchBar = document.getElementById("searchBar");
+const darkToggle = document.getElementById("darkToggle");
 
-    onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        location.href = "index.html";
-        return;
-      }
-      const chatList = await fetchChatList(user.uid);
-      chatListDiv.innerHTML = "";
-      chatList.forEach(chat => {
-        const div = document.createElement("div");
-        div.className = "chatItem";
-        div.textContent = chat.id + " : " + chat.lastMessage;
-        div.onclick = () => { location.href = `dm.html?opponentId=${chat.id}`; };
-        chatListDiv.appendChild(div);
-      });
-    });
+let chatListData = []; // 元データ保持
 
-    async function fetchChatList(currentUserId){
-      const chatListRef = collection(db, "chats", currentUserId, "list");
-      const chatListSnap = await getDocs(chatListRef);
-      const list = [];
+// ダークモード切替
+darkToggle.onclick = ()=>{
+  document.body.classList.toggle("dark");
+};
 
-      for(const docSnap of chatListSnap.docs){
-        const opponentId = docSnap.id;
-        const userRef = doc(db, "users", opponentId);
-        const userSnap = await getDoc(userRef);
+onAuthStateChanged(auth, async (user) => {
+  if(!user){ location.href="index.html"; return; }
+  chatListData = await fetchChatList(user.uid);
+  renderList(chatListData);
+});
 
-        if(!userSnap.exists() || userSnap.data().active === false){
-          await deleteDoc(doc(chatListRef, opponentId));
-          continue;
-        }
+// 検索バーイベント
+searchBar.addEventListener("input", ()=>{
+  const query = searchBar.value.toLowerCase();
+  const filtered = chatListData.filter(c=>c.id.toLowerCase().includes(query) || (c.lastMessage && c.lastMessage.toLowerCase().includes(query)));
+  renderList(filtered);
+});
 
-        list.push({ id: opponentId, ...docSnap.data() });
-      }
-      return list;
+function renderList(list){
+  chatListDiv.innerHTML = "";
+  list.forEach(chat=>{
+    const div = document.createElement("div");
+    div.className = "chatItem";
+    div.textContent = chat.id + " : " + chat.lastMessage;
+    div.onclick = ()=>{ location.href=`dm.html?opponentId=${chat.id}`; };
+    chatListDiv.appendChild(div);
+  });
+}
+
+async function fetchChatList(currentUserId){
+  const chatListRef = collection(db,"chats",currentUserId,"list");
+  const chatListSnap = await getDocs(chatListRef);
+  const list=[];
+  for(const docSnap of chatListSnap.docs){
+    const opponentId = docSnap.id;
+    const userRef = doc(db,"users",opponentId);
+    const userSnap = await getDoc(userRef);
+    if(!userSnap.exists() || userSnap.data().active===false){
+      await deleteDoc(doc(chatListRef,opponentId));
+      continue;
     }
-  </script>
+    list.push({ id: opponentId, ...docSnap.data() });
+  }
+  return list;
+}
+</script>
 </head>
 <body>
-  <h2>チャット一覧</h2>
-  <div id="chatList"></div>
+<h2>チャット一覧</h2>
+<button id="darkToggle">ダークモード切替</button>
+<input type="text" id="searchBar" placeholder="検索…">
+<div id="chatList"></div>
 </body>
 </html>
