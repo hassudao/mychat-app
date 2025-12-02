@@ -1,185 +1,194 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>MyChat - トークリスト</title>
-  <style>
-    body { font-family:sans-serif; padding:20px; transition: background 0.3s, color 0.3s; }
-    body.dark { background:#1e1e1e; color:#f0f0f0; }
-    #tabs { display:flex; gap:10px; margin-bottom:10px; }
-    .tabBtn { padding:5px 10px; cursor:pointer; border:none; border-radius:5px; background:#ccc; }
-    .tabBtn.active { background:#6200ea; color:white; }
-    #chatList { max-width:400px; margin:auto; }
-    .chatItem { border:1px solid #ccc; padding:10px; margin-bottom:5px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; }
-    .chatItem img { width:40px; height:40px; border-radius:50%; margin-right:10px; }
-    .chatInfo { display:flex; align-items:center; flex:1; }
-    #searchBar { width:300px; padding:5px; margin-bottom:10px; }
-    #darkToggle { padding:5px 10px; margin-left:10px; }
-    .followBtn { padding:5px 8px; cursor:pointer; }
-  </style>
+<meta charset="utf-8">
+<title>MyChat - トークリスト</title>
+<style>
+body { font-family:sans-serif; padding:20px; transition: background 0.3s, color 0.3s; }
+body.dark { background:#1e1e1e; color:#f0f0f0; }
+#tabs { display:flex; gap:10px; margin-bottom:10px; }
+.tabBtn { padding:5px 10px; cursor:pointer; border:none; border-radius:5px; background:#ccc; }
+.tabBtn.active { background:#6200ea; color:white; }
+.listContainer { max-width:400px; margin:auto; }
+.listContainer div { border:1px solid #ccc; padding:10px; margin-bottom:5px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; }
+.listContainer img { width:40px; height:40px; border-radius:50%; margin-right:10px; }
+.listInfo { display:flex; align-items:center; flex:1; }
+.followBtn { padding:5px 8px; cursor:pointer; }
+#searchBar { width:300px; padding:5px; margin-bottom:10px; }
+#darkToggle { padding:5px 10px; margin-left:10px; }
+</style>
 
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
-  <h2>MyChat</h2>
-  <div id="tabs">
-    <button class="tabBtn active" id="tabChats">チャット一覧</button>
-    <button class="tabBtn" id="tabFollows">フォロー中一覧</button>
-    <button id="darkToggle">ダークモード切替</button>
-  </div>
-  <input type="text" id="searchBar" placeholder="ユーザーを検索...">
-  <div id="chatList"></div>
+<h2>MyChat</h2>
+<div id="tabs">
+  <button class="tabBtn active" id="tabChats">チャット一覧</button>
+  <button class="tabBtn" id="tabFollows">フォロー中一覧</button>
+  <button id="darkToggle">ダークモード切替</button>
+</div>
+<input type="text" id="searchBar" placeholder="ユーザーを検索...">
+<!-- 検索候補リスト -->
+<div id="searchResults" class="listContainer" style="display:none;"></div>
+<!-- チャット一覧リスト -->
+<div id="chatList" class="listContainer"></div>
+<!-- フォロー中リスト -->
+<div id="followList" class="listContainer" style="display:none;"></div>
 
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
-      authDomain: "chatapp-hassu.firebaseapp.com",
-      databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "chatapp-hassu",
-      storageBucket: "chatapp-hassu.appspot.com",
-      messagingSenderId: "8489684752",
-      appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
-    };
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
+  authDomain: "chatapp-hassu.firebaseapp.com",
+  databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "chatapp-hassu",
+  storageBucket: "chatapp-hassu.appspot.com",
+  messagingSenderId: "8489684752",
+  appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const database = firebase.database();
 
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const database = firebase.database();
+const searchBar = document.getElementById("searchBar");
+const darkToggle = document.getElementById("darkToggle");
+const tabChats = document.getElementById("tabChats");
+const tabFollows = document.getElementById("tabFollows");
 
-    const chatListDiv = document.getElementById("chatList");
-    const searchBar = document.getElementById("searchBar");
-    const darkToggle = document.getElementById("darkToggle");
-    const tabChats = document.getElementById("tabChats");
-    const tabFollows = document.getElementById("tabFollows");
+const searchResultsDiv = document.getElementById("searchResults");
+const chatListDiv = document.getElementById("chatList");
+const followListDiv = document.getElementById("followList");
 
-    let currentUser = null;
-    let chatData = [];
-    let followData = [];
-    let activeTab = 'chats';
+let currentUser=null;
+let chatData=[], followData=[];
+let activeTab='chats';
 
-    if(localStorage.getItem("darkMode")==="true") document.body.classList.add("dark");
+if(localStorage.getItem("darkMode")==="true") document.body.classList.add("dark");
+darkToggle.onclick = ()=>{
+  document.body.classList.toggle("dark");
+  localStorage.setItem("darkMode", document.body.classList.contains("dark"));
+};
 
-    darkToggle.onclick = ()=>{
-      document.body.classList.toggle("dark");
-      localStorage.setItem("darkMode", document.body.classList.contains("dark"));
-    };
+tabChats.onclick = ()=>{
+  activeTab='chats';
+  tabChats.classList.add("active");
+  tabFollows.classList.remove("active");
+  followListDiv.style.display='none';
+  chatListDiv.style.display='block';
+};
 
-    tabChats.onclick = ()=>{
-      activeTab='chats';
-      tabChats.classList.add("active");
-      tabFollows.classList.remove("active");
-      displayList();
-    };
+tabFollows.onclick = ()=>{
+  activeTab='follows';
+  tabFollows.classList.add("active");
+  tabChats.classList.remove("active");
+  chatListDiv.style.display='none';
+  followListDiv.style.display='block';
+};
 
-    tabFollows.onclick = ()=>{
-      activeTab='follows';
-      tabFollows.classList.add("active");
-      tabChats.classList.remove("active");
-      displayList();
-    };
+auth.onAuthStateChanged(user=>{
+  if(!user){ location.href="index.html"; return; }
+  currentUser=user;
+  loadChats();
+  loadFollows();
+});
 
-    auth.onAuthStateChanged(user=>{
-      if(!user){ location.href="index.html"; return; }
-      currentUser = user;
-      loadChats();
-      loadFollows();
-    });
-
-    function loadChats(){
-      database.ref("chats/"+currentUser.uid+"/list").on("value", snapshot=>{
-        const data = snapshot.val() || {};
-        chatData = [];
-        const promises = [];
-        for(const uid in data){
-          promises.push(
-            database.ref("users/"+uid).once("value").then(uSnap=>{
-              const u = uSnap.val();
-              if(!u){
-                database.ref("chats/"+currentUser.uid+"/list/"+uid).remove();
-                return;
-              }
-              chatData.push({
-                id: uid,
-                lastMessage: data[uid].lastMessage,
-                displayName: u.displayName||uid,
-                photoURL: u.photoURL||"https://via.placeholder.com/40",
-                followers: u.followers||[]
-              });
-            })
-          );
-        }
-        Promise.all(promises).then(()=>{ if(activeTab==='chats') displayList(); });
-      });
-    }
-
-    function loadFollows(){
-      database.ref("users/"+currentUser.uid+"/following").on("value", snap=>{
-        const data = snap.val() || [];
-        followData = [];
-        const promises = [];
-        data.forEach(fid=>{
-          promises.push(
-            database.ref("users/"+fid).once("value").then(uSnap=>{
-              const u = uSnap.val();
-              if(!u) return;
-              followData.push({
-                id: fid,
-                displayName: u.displayName||fid,
-                photoURL: u.photoURL||"https://via.placeholder.com/40",
-                followers: u.followers||[]
-              });
-            })
-          );
+function loadChats(){
+  database.ref("chats/"+currentUser.uid+"/list").on("value", snap=>{
+    const data = snap.val()||{};
+    chatData=[];
+    const promises=[];
+    for(const uid in data){
+      promises.push(database.ref("users/"+uid).once("value").then(uSnap=>{
+        const u=uSnap.val();
+        if(!u){ database.ref("chats/"+currentUser.uid+"/list/"+uid).remove(); return; }
+        chatData.push({
+          id: uid, lastMessage: data[uid].lastMessage,
+          displayName: u.displayName||uid, photoURL: u.photoURL||"https://via.placeholder.com/40"
         });
-        Promise.all(promises).then(()=>{ if(activeTab==='follows') displayList(); });
-      });
+      }));
     }
+    Promise.all(promises).then(()=>{ if(activeTab==='chats') displayChats(); });
+  });
+}
 
-    function displayList(){
-      chatListDiv.innerHTML = "";
-      let list = activeTab==='chats' ? chatData : followData;
-      const kw = searchBar.value.trim().toLowerCase();
-      if(kw) list = list.filter(u=>{
-        return (u.displayName||"").toLowerCase().includes(kw) || u.id.toLowerCase().includes(kw);
+function loadFollows(){
+  database.ref("users/"+currentUser.uid+"/following").on("value", snap=>{
+    const data = snap.val()||[];
+    followData=[];
+    const promises=[];
+    data.forEach(fid=>{
+      promises.push(database.ref("users/"+fid).once("value").then(uSnap=>{
+        const u=uSnap.val();
+        if(!u) return;
+        followData.push({
+          id: fid, displayName:u.displayName||fid, photoURL:u.photoURL||"https://via.placeholder.com/40"
+        });
+      }));
+    });
+    Promise.all(promises).then(()=>{ if(activeTab==='follows') displayFollows(); });
+  });
+}
+
+function createUserDiv(user, isFollow=false){
+  const div=document.createElement("div");
+  const infoDiv=document.createElement("div");
+  infoDiv.className="listInfo";
+  const img=document.createElement("img");
+  img.src=user.photoURL;
+  infoDiv.appendChild(img);
+  infoDiv.appendChild(document.createTextNode(user.displayName+(user.lastMessage?': '+user.lastMessage:'') ));
+  div.appendChild(infoDiv);
+
+  if(isFollow){
+    const btn=document.createElement("button");
+    btn.className="followBtn";
+    btn.textContent="フォロー中";
+    btn.onclick=(e)=>{
+      e.stopPropagation();
+      // フォロー解除
+      database.ref("users/"+currentUser.uid+"/following").once("value").then(snap=>{
+        let arr = snap.val()||[];
+        arr = arr.filter(uid=>uid!==user.id);
+        database.ref("users/"+currentUser.uid+"/following").set(arr);
       });
+    };
+    div.appendChild(btn);
+  }
 
-      list.forEach(chat=>{
-        const div = document.createElement("div");
-        div.className="chatItem";
+  div.onclick = ()=> location.href="dm.html?opponentId="+user.id;
+  return div;
+}
 
-        const infoDiv = document.createElement("div");
-        infoDiv.className="chatInfo";
-        const img = document.createElement("img");
-        img.src = chat.photoURL;
-        infoDiv.appendChild(img);
+function displayChats(){
+  chatListDiv.innerHTML="";
+  chatData.forEach(u=>chatListDiv.appendChild(createUserDiv(u)));
+}
 
-        const text = document.createTextNode(`${chat.displayName} : ${chat.lastMessage||""}`);
-        infoDiv.appendChild(text);
-        div.appendChild(infoDiv);
+function displayFollows(){
+  followListDiv.innerHTML="";
+  followData.forEach(u=>followListDiv.appendChild(createUserDiv(u,true)));
+}
 
-        if(activeTab==='follows'){
-          const followBtn = document.createElement("button");
-          followBtn.className="followBtn";
-          followBtn.textContent = "フォロー中";
-          followBtn.onclick = (e)=>{
-            e.stopPropagation();
-            // フォロー解除
-            database.ref("users/"+currentUser.uid+"/following").once("value").then(snap=>{
-              let arr = snap.val()||[];
-              arr = arr.filter(uid=>uid!==chat.id);
-              database.ref("users/"+currentUser.uid+"/following").set(arr);
-            });
-          };
-          div.appendChild(followBtn);
-        }
-
-        div.onclick = ()=> location.href="dm.html?opponentId="+chat.id;
-        chatListDiv.appendChild(div);
-      });
+searchBar.addEventListener("input", ()=>{
+  const kw=searchBar.value.trim().toLowerCase();
+  if(!kw){ searchResultsDiv.style.display='none'; return; }
+  searchResultsDiv.style.display='block';
+  searchResultsDiv.innerHTML="";
+  database.ref("users").once("value").then(snap=>{
+    const users=snap.val()||{};
+    for(const uid in users){
+      const u=users[uid];
+      if(!u||uid===currentUser.uid) continue;
+      const name=(u.displayName||"").toLowerCase();
+      const email=(u.email||"").toLowerCase();
+      if(uid.toLowerCase().includes(kw)||name.includes(kw)||email.includes(kw)){
+        const tempDiv=createUserDiv({id:uid, displayName:u.displayName, photoURL:u.photoURL||"https://via.placeholder.com/40"});
+        searchResultsDiv.appendChild(tempDiv);
+      }
     }
-
-    searchBar.addEventListener("input", displayList);
-  </script>
+  });
+});
+</script>
 </body>
 </html>
