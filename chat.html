@@ -4,18 +4,18 @@
   <meta charset="utf-8">
   <title>MyChat - トークリスト</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; transition: background 0.3s, color 0.3s; }
-    body.dark { background: #1e1e1e; color: #f0f0f0; }
-    #chatList { max-width: 400px; margin: auto; }
+    body { font-family:sans-serif; padding:20px; transition: background 0.3s, color 0.3s; }
+    body.dark { background:#1e1e1e; color:#f0f0f0; }
+    #chatList { max-width:400px; margin:auto; }
     .chatItem { border:1px solid #ccc; padding:10px; margin-bottom:5px; cursor:pointer; display:flex; align-items:center; }
     .chatItem img { width:30px; height:30px; border-radius:50%; margin-right:10px; }
-    #searchBar { width: 300px; padding:5px; margin-bottom:10px; }
+    #searchBar { width:300px; padding:5px; margin-bottom:10px; }
     #darkToggle { padding:5px 10px; margin-left:10px; }
   </style>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, getDoc, doc, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+    import { getFirestore, collection, doc, getDoc, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -36,52 +36,55 @@
     const searchBar = document.getElementById("searchBar");
     const darkToggle = document.getElementById("darkToggle");
 
+    let unsubscribeChatList = null;
+
     // ダークモード初期化
     if(localStorage.getItem("darkMode") === "true") document.body.classList.add("dark");
+
     darkToggle.onclick = ()=>{
       document.body.classList.toggle("dark");
       localStorage.setItem("darkMode", document.body.classList.contains("dark"));
     };
 
-    let unsubscribeChat = null; // リアルタイム監視の停止用
-
-    onAuthStateChanged(auth, async (user) => {
+    onAuthStateChanged(auth, async (user)=>{
       if(!user){ location.href="index.html"; return; }
       window.currentUser = user;
 
-      setupChatListener(); // リアルタイムチャット監視
+      // チャットリストをリアルタイム監視
+      startChatListListener();
 
-      // 検索バー
+      // 検索バーイベント
       searchBar.addEventListener("input", async ()=>{
         const kw = searchBar.value.trim().toLowerCase();
         if(!kw){
-          setupChatListener(); // 空なら通常表示に戻す
-        } else {
-          if(unsubscribeChat) unsubscribeChat(); // 一旦リアルタイム解除
-          await searchUsers(kw);
+          startChatListListener();
+          return;
         }
+        await searchUsers(kw);
       });
     });
 
-    function setupChatListener(){
-      if(unsubscribeChat) unsubscribeChat(); // 前回の監視解除
-      const chatRef = collection(db,"chats",currentUser.uid,"list");
-      unsubscribeChat = onSnapshot(chatRef, async (snap)=>{
+    function startChatListListener(){
+      if(unsubscribeChatList) unsubscribeChatList();
+      const chatListRef = collection(db,"chats",currentUser.uid,"list");
+
+      unsubscribeChatList = onSnapshot(chatListRef, async (snapshot)=>{
         const list = [];
-        for(const docSnap of snap.docs){
+        for(const docSnap of snapshot.docs){
           const opponentId = docSnap.id;
           const userRef = doc(db,"users",opponentId);
           const userSnap = await getDoc(userRef);
           if(!userSnap.exists() || userSnap.data().active===false){
-            await deleteDoc(doc(chatRef, opponentId));
+            await deleteDoc(doc(chatListRef,opponentId));
             continue;
           }
-          list.push({
+          list.push({ 
             id: opponentId,
             lastMessage: docSnap.data().lastMessage,
             icon: userSnap.data().icon,
             name: userSnap.data().name,
-            following: userSnap.data().followers?.includes(currentUser.uid) || false
+            email: userSnap.data().email,
+            isFollowing: userSnap.data().followers?.includes(currentUser.uid) || false
           });
         }
         displayChatList(list);
@@ -94,22 +97,22 @@
         const div = document.createElement("div");
         div.className="chatItem";
         const img = document.createElement("img");
-        img.src = chat.icon || "default_icon.png";
+        img.src=chat.icon || "default_icon.png";
         div.appendChild(img);
-        const text = `${chat.name || chat.id} : ${chat.lastMessage || ""} ${chat.following ? "(フォロー中)" : ""}`;
-        div.appendChild(document.createTextNode(text));
-        div.onclick=()=>{ location.href=`dm.html?opponentId=${chat.id}`; };
+        const text = document.createTextNode(`${chat.name || chat.id}${chat.isFollowing ? " (フォロー中)" : ""} : ${chat.lastMessage || ""}`);
+        div.appendChild(text);
+        div.onclick = ()=>{ location.href=`dm.html?opponentId=${chat.id}`; };
         chatListDiv.appendChild(div);
       });
     }
 
     async function searchUsers(keyword){
       const usersRef = collection(db,"users");
-      const snap = await getDocs(usersRef);
+      const usersSnap = await getDocs(usersRef);
       const results = [];
-      snap.forEach(docSnap=>{
+      usersSnap.forEach(docSnap=>{
         const data = docSnap.data();
-        if(data.active===false) return;
+        if(data.active === false) return;
         const id = docSnap.id.toLowerCase();
         const name = (data.name||"").toLowerCase();
         const email = (data.email||"").toLowerCase();
@@ -117,9 +120,10 @@
           results.push({
             id: docSnap.id,
             icon: data.icon || "default_icon.png",
-            name: data.name || docSnap.id,
             lastMessage:"",
-            following: data.followers?.includes(currentUser.uid) || false
+            name: data.name,
+            email: data.email,
+            isFollowing: data.followers?.includes(currentUser.uid) || false
           });
         }
       });
