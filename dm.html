@@ -4,16 +4,17 @@
 <meta charset="utf-8">
 <title>MyChat - DM</title>
 <style>
-  body { font-family:sans-serif; margin:0; background:#f4f4f8; display:flex; flex-direction:column; height:100vh; }
-  header { background:#6200ea; color:white; padding:10px; display:flex; align-items:center; }
-  header img { width:40px; height:40px; border-radius:50%; margin-right:10px; }
-  header span { font-weight:bold; font-size:1.2em; }
+  body { font-family:sans-serif; margin:0; display:flex; flex-direction:column; height:100vh; transition: background 0.3s, color 0.3s; }
+  body.dark { background:#121212; color:#f0f0f0; }
+  header { background:#6200ea; color:white; padding:10px; display:flex; align-items:center; justify-content:space-between; }
+  header .left { display:flex; align-items:center; gap:10px; }
+  header img { width:40px; height:40px; border-radius:50%; }
   #messages { flex:1; overflow-y:auto; padding:10px; display:flex; flex-direction:column; gap:10px; }
-  .msg { display:flex; max-width:70%; padding:8px 12px; border-radius:15px; word-wrap:break-word; }
+  .msgContainer { display:flex; align-items:flex-end; gap:8px; }
+  .msg { max-width:70%; padding:8px 12px; border-radius:15px; word-wrap:break-word; }
   .myMsg { background:#6200ea; color:white; align-self:flex-end; border-bottom-right-radius:3px; }
   .otherMsg { background:#e0e0e0; color:black; align-self:flex-start; border-bottom-left-radius:3px; }
-  .msgIcon { width:35px; height:35px; border-radius:50%; margin-right:8px; }
-  .msgContainer { display:flex; align-items:flex-end; gap:8px; }
+  .msgIcon { width:35px; height:35px; border-radius:50%; vertical-align:middle; }
   .msgTime { font-size:0.7em; color:#555; margin-left:5px; }
   .msgRead { font-size:0.7em; color:#555; margin-left:5px; }
   footer { padding:10px; display:flex; gap:5px; border-top:1px solid #ccc; background:white; }
@@ -27,9 +28,13 @@
 </head>
 
 <body>
-<header id="header">
-  <img id="opponentIcon" src="https://via.placeholder.com/40">
-  <span id="opponentName">ユーザー</span>
+<header>
+  <div class="left">
+    <button id="backBtn">◀一覧</button>
+    <img id="opponentIcon" src="https://via.placeholder.com/40">
+    <span id="opponentName">ユーザー</span>
+  </div>
+  <button id="settingsBtn">⚙️ 設定</button>
 </header>
 
 <div id="messages"></div>
@@ -57,21 +62,30 @@ const database = firebase.database();
 const params = new URLSearchParams(window.location.search);
 const opponentId = params.get("opponentId");
 
-if(!opponentId) alert("opponentId がありません");
-
 const messagesDiv = document.getElementById("messages");
 const msgInput = document.getElementById("msgInput");
 const sendBtn = document.getElementById("sendBtn");
 const opponentIconImg = document.getElementById("opponentIcon");
 const opponentNameSpan = document.getElementById("opponentName");
+const backBtn = document.getElementById("backBtn");
+const settingsBtn = document.getElementById("settingsBtn");
 
 let currentUser = null;
 let opponentData = null;
 
+// DM設定の保存（背景色やダークモード）
+function applyDMSettings(){
+  const bg = localStorage.getItem("dmBg") || "#f4f4f8";
+  document.body.style.background = bg;
+  if(localStorage.getItem("dmDarkMode")==="true") document.body.classList.add("dark");
+  else document.body.classList.remove("dark");
+}
+
+applyDMSettings();
+
 auth.onAuthStateChanged(user=>{
   if(!user){ location.href="index.html"; return; }
   currentUser = user;
-
   database.ref("users/"+opponentId).once("value").then(snap=>{
     opponentData = snap.val();
     if(!opponentData) alert("相手が存在しません");
@@ -81,9 +95,13 @@ auth.onAuthStateChanged(user=>{
   });
 });
 
-function getChatId(){
-  return currentUser.uid < opponentId ? currentUser.uid+"_"+opponentId : opponentId+"_"+currentUser.uid;
-}
+// 戻るボタン
+backBtn.onclick = ()=> location.href="chat.html";
+
+// 設定ボタン
+settingsBtn.onclick = ()=> location.href="dm-settings.html?opponentId="+opponentId;
+
+function getChatId(){ return currentUser.uid < opponentId ? currentUser.uid+"_"+opponentId : opponentId+"_"+currentUser.uid; }
 
 function startListening(){
   const chatRef = database.ref(`messages/${getChatId()}`);
