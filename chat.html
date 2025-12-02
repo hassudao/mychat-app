@@ -43,13 +43,8 @@ body.dark { background:#1e1e1e; color:#f0f0f0; }
 
 <input type="text" id="searchBar" placeholder="ユーザーを検索...">
 
-<!-- 検索候補リスト（フォローボタンあり） -->
 <div id="searchResults" class="listContainer" style="display:none;"></div>
-
-<!-- チャット一覧 -->
 <div id="chatList" class="listContainer"></div>
-
-<!-- フォロー中一覧（フォロー解除ボタンあり） -->
 <div id="followList" class="listContainer" style="display:none;"></div>
 
 <script>
@@ -81,9 +76,7 @@ let chatData=[];
 let followData=[];
 let activeTab="chats";
 
-/* --------------------
-  ダークモード
---------------------- */
+/* -------------------- ダークモード --------------------- */
 if(localStorage.getItem("darkMode")==="true") {
   document.body.classList.add("dark");
 }
@@ -93,9 +86,7 @@ darkToggle.onclick = ()=>{
     document.body.classList.contains("dark"));
 };
 
-/* --------------------
-  タブ切替
---------------------- */
+/* -------------------- タブ切替 --------------------- */
 tabChats.onclick = ()=>{
   activeTab='chats';
   tabChats.classList.add("active");
@@ -121,9 +112,7 @@ auth.onAuthStateChanged(user=>{
   loadFollows();
 });
 
-/* --------------------
-  チャット一覧ロード
---------------------- */
+/* -------------------- チャット一覧 --------------------- */
 function loadChats(){
   database.ref("chats/"+currentUser.uid+"/list").on("value", snap=>{
     const data = snap.val() || {};
@@ -152,9 +141,7 @@ function loadChats(){
   });
 }
 
-/* --------------------
-  フォロー中一覧ロード
---------------------- */
+/* -------------------- フォロー一覧 --------------------- */
 function loadFollows(){
   database.ref("users/"+currentUser.uid+"/following").on("value", snap=>{
     const arr = snap.val() || [];
@@ -181,11 +168,8 @@ function loadFollows(){
   });
 }
 
-/* --------------------
-  DOM生成（検索/フォロー）
---------------------- */
+/* -------------------- ユーザーDIV生成（統合版） --------------------- */
 function createUserDiv(user, mode){
-  // mode: "search", "follow", "chat"
   const div=document.createElement("div");
 
   const info=document.createElement("div");
@@ -197,19 +181,30 @@ function createUserDiv(user, mode){
   info.appendChild(document.createTextNode(user.displayName + (user.lastMessage? "： "+user.lastMessage : "")));
   div.appendChild(info);
 
-  /* --- 検索結果 --- */
-  if(mode==="search"){
+  /* フォローボタン（検索 & フォロー一覧の共通処理） */
+  if(mode==="search" || mode==="follow"){
     const btn=document.createElement("button");
     btn.className="followBtn";
-    btn.textContent="フォロー";
+
+    // 初期表示
+    database.ref("users/"+currentUser.uid+"/following").once("value").then(s=>{
+      let arr=s.val()||[];
+      btn.textContent = arr.includes(user.id) ? "フォロー中" : "フォロー";
+    });
 
     btn.onclick=(e)=>{
       e.stopPropagation();
       database.ref("users/"+currentUser.uid+"/following").once("value").then(s=>{
         let arr=s.val()||[];
-        if(!arr.includes(user.id)){
+
+        if(arr.includes(user.id)){
+          arr = arr.filter(id=>id !== user.id);
+          btn.textContent="フォロー";
+        }else{
           arr.push(user.id);
+          btn.textContent="フォロー中";
         }
+
         database.ref("users/"+currentUser.uid+"/following").set(arr);
       });
     };
@@ -217,34 +212,32 @@ function createUserDiv(user, mode){
     div.appendChild(btn);
   }
 
-  /* --- フォロー中 --- */
-  if(mode==="follow"){
-    const btn=document.createElement("button");
-    btn.className="followBtn";
-    btn.textContent="解除";
-
-    btn.onclick=(e)=>{
-      e.stopPropagation();
-      database.ref("users/"+currentUser.uid+"/following").once("value").then(s=>{
-        let arr=s.val()||[];
-        arr = arr.filter(id=>id !== user.id);
-        database.ref("users/"+currentUser.uid+"/following").set(arr);
-      });
-    };
-
-    div.appendChild(btn);
-  }
-
+  /* DMへ遷移（相互フォロー必須） */
   div.onclick = ()=>{
-    location.href = "dm.html?opponentId="+user.id;
+    if(mode==="chat"){
+      location.href = "dm.html?opponentId="+user.id;
+      return;
+    }
+
+    Promise.all([
+      database.ref("users/"+currentUser.uid+"/following").once("value"),
+      database.ref("users/"+user.id+"/following").once("value")
+    ]).then(([mine, theirs])=>{
+      const meF = mine.val()||[];
+      const theyF = theirs.val()||[];
+
+      if(meF.includes(user.id) && theyF.includes(currentUser.uid)){
+        location.href = "dm.html?opponentId="+user.id;
+      } else {
+        alert("相互フォローの相手だけDMできるでよ！😤🔥");
+      }
+    });
   };
 
   return div;
 }
 
-/* --------------------
-  表示処理
---------------------- */
+/* -------------------- 表示処理 --------------------- */
 function displayChats(){
   chatListDiv.innerHTML="";
   chatData.forEach(u=>{
@@ -259,9 +252,7 @@ function displayFollows(){
   });
 }
 
-/* --------------------
-  検索機能（フォローボタン付き）
---------------------- */
+/* -------------------- 検索機能 --------------------- */
 searchBar.addEventListener("input", ()=>{
   const kw=searchBar.value.trim().toLowerCase();
   if(!kw){
