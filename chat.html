@@ -4,16 +4,26 @@
 <meta charset="utf-8">
 <title>MyChat - トークリスト</title>
 <style>
-body { font-family:sans-serif; padding:20px; transition: background 0.3s, color 0.3s; }
+body {
+  font-family:sans-serif; padding:20px;
+  transition: background 0.3s, color 0.3s;
+}
 body.dark { background:#1e1e1e; color:#f0f0f0; }
+
 #tabs { display:flex; gap:10px; margin-bottom:10px; }
 .tabBtn { padding:5px 10px; cursor:pointer; border:none; border-radius:5px; background:#ccc; }
 .tabBtn.active { background:#6200ea; color:white; }
+
 .listContainer { max-width:400px; margin:auto; }
-.listContainer div { border:1px solid #ccc; padding:10px; margin-bottom:5px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; }
+.listContainer div {
+  border:1px solid #ccc; padding:10px; margin-bottom:5px;
+  cursor:pointer; display:flex; align-items:center; justify-content:space-between;
+}
 .listContainer img { width:40px; height:40px; border-radius:50%; margin-right:10px; }
 .listInfo { display:flex; align-items:center; flex:1; }
+
 .followBtn { padding:5px 8px; cursor:pointer; }
+
 #searchBar { width:300px; padding:5px; margin-bottom:10px; }
 #darkToggle { padding:5px 10px; margin-left:10px; }
 </style>
@@ -24,17 +34,22 @@ body.dark { background:#1e1e1e; color:#f0f0f0; }
 </head>
 <body>
 <h2>MyChat</h2>
+
 <div id="tabs">
   <button class="tabBtn active" id="tabChats">チャット一覧</button>
   <button class="tabBtn" id="tabFollows">フォロー中一覧</button>
   <button id="darkToggle">ダークモード切替</button>
 </div>
+
 <input type="text" id="searchBar" placeholder="ユーザーを検索...">
-<!-- 検索候補リスト -->
+
+<!-- 検索候補リスト（フォローボタンあり） -->
 <div id="searchResults" class="listContainer" style="display:none;"></div>
-<!-- チャット一覧リスト -->
+
+<!-- チャット一覧 -->
 <div id="chatList" class="listContainer"></div>
-<!-- フォロー中リスト -->
+
+<!-- フォロー中一覧（フォロー解除ボタンあり） -->
 <div id="followList" class="listContainer" style="display:none;"></div>
 
 <script>
@@ -48,32 +63,44 @@ const firebaseConfig = {
   appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
 };
 firebase.initializeApp(firebaseConfig);
+
 const auth = firebase.auth();
 const database = firebase.database();
 
 const searchBar = document.getElementById("searchBar");
-const darkToggle = document.getElementById("darkToggle");
 const tabChats = document.getElementById("tabChats");
 const tabFollows = document.getElementById("tabFollows");
+const darkToggle = document.getElementById("darkToggle");
 
 const searchResultsDiv = document.getElementById("searchResults");
 const chatListDiv = document.getElementById("chatList");
 const followListDiv = document.getElementById("followList");
 
 let currentUser=null;
-let chatData=[], followData=[];
-let activeTab='chats';
+let chatData=[];
+let followData=[];
+let activeTab="chats";
 
-if(localStorage.getItem("darkMode")==="true") document.body.classList.add("dark");
+/* --------------------
+  ダークモード
+--------------------- */
+if(localStorage.getItem("darkMode")==="true") {
+  document.body.classList.add("dark");
+}
 darkToggle.onclick = ()=>{
   document.body.classList.toggle("dark");
-  localStorage.setItem("darkMode", document.body.classList.contains("dark"));
+  localStorage.setItem("darkMode",
+    document.body.classList.contains("dark"));
 };
 
+/* --------------------
+  タブ切替
+--------------------- */
 tabChats.onclick = ()=>{
   activeTab='chats';
   tabChats.classList.add("active");
   tabFollows.classList.remove("active");
+  searchResultsDiv.style.display='none';
   followListDiv.style.display='none';
   chatListDiv.style.display='block';
 };
@@ -82,6 +109,7 @@ tabFollows.onclick = ()=>{
   activeTab='follows';
   tabFollows.classList.add("active");
   tabChats.classList.remove("active");
+  searchResultsDiv.style.display='none';
   chatListDiv.style.display='none';
   followListDiv.style.display='block';
 };
@@ -93,98 +121,171 @@ auth.onAuthStateChanged(user=>{
   loadFollows();
 });
 
+/* --------------------
+  チャット一覧ロード
+--------------------- */
 function loadChats(){
   database.ref("chats/"+currentUser.uid+"/list").on("value", snap=>{
-    const data = snap.val()||{};
-    chatData=[];
+    const data = snap.val() || {};
+    chatData = [];
     const promises=[];
     for(const uid in data){
-      promises.push(database.ref("users/"+uid).once("value").then(uSnap=>{
-        const u=uSnap.val();
-        if(!u){ database.ref("chats/"+currentUser.uid+"/list/"+uid).remove(); return; }
-        chatData.push({
-          id: uid, lastMessage: data[uid].lastMessage,
-          displayName: u.displayName||uid, photoURL: u.photoURL||"https://via.placeholder.com/40"
-        });
-      }));
+      promises.push(
+        database.ref("users/"+uid).once("value").then(uSnap=>{
+          const u=uSnap.val();
+          if(!u){
+            database.ref("chats/"+currentUser.uid+"/list/"+uid).remove();
+            return;
+          }
+          chatData.push({
+            id: uid,
+            lastMessage: data[uid].lastMessage || "",
+            displayName: u.displayName || uid,
+            photoURL: u.photoURL || "https://via.placeholder.com/40"
+          });
+        })
+      );
     }
-    Promise.all(promises).then(()=>{ if(activeTab==='chats') displayChats(); });
+    Promise.all(promises).then(()=>{
+      if(activeTab==='chats') displayChats();
+    });
   });
 }
 
+/* --------------------
+  フォロー中一覧ロード
+--------------------- */
 function loadFollows(){
   database.ref("users/"+currentUser.uid+"/following").on("value", snap=>{
-    const data = snap.val()||[];
+    const arr = snap.val() || [];
     followData=[];
     const promises=[];
-    data.forEach(fid=>{
-      promises.push(database.ref("users/"+fid).once("value").then(uSnap=>{
-        const u=uSnap.val();
-        if(!u) return;
-        followData.push({
-          id: fid, displayName:u.displayName||fid, photoURL:u.photoURL||"https://via.placeholder.com/40"
-        });
-      }));
+
+    arr.forEach(fid=>{
+      promises.push(
+        database.ref("users/"+fid).once("value").then(uSnap=>{
+          const u=uSnap.val();
+          if(!u) return;
+          followData.push({
+            id: fid,
+            displayName: u.displayName,
+            photoURL: u.photoURL || "https://via.placeholder.com/40"
+          });
+        })
+      );
     });
-    Promise.all(promises).then(()=>{ if(activeTab==='follows') displayFollows(); });
+
+    Promise.all(promises).then(()=>{
+      if(activeTab==='follows') displayFollows();
+    });
   });
 }
 
-function createUserDiv(user, isFollow=false){
+/* --------------------
+  DOM生成（検索/フォロー）
+--------------------- */
+function createUserDiv(user, mode){
+  // mode: "search", "follow", "chat"
   const div=document.createElement("div");
-  const infoDiv=document.createElement("div");
-  infoDiv.className="listInfo";
+
+  const info=document.createElement("div");
+  info.className="listInfo";
+
   const img=document.createElement("img");
   img.src=user.photoURL;
-  infoDiv.appendChild(img);
-  infoDiv.appendChild(document.createTextNode(user.displayName+(user.lastMessage?': '+user.lastMessage:'') ));
-  div.appendChild(infoDiv);
+  info.appendChild(img);
+  info.appendChild(document.createTextNode(user.displayName + (user.lastMessage? "： "+user.lastMessage : "")));
+  div.appendChild(info);
 
-  if(isFollow){
+  /* --- 検索結果 --- */
+  if(mode==="search"){
     const btn=document.createElement("button");
     btn.className="followBtn";
-    btn.textContent="フォロー中";
+    btn.textContent="フォロー";
+
     btn.onclick=(e)=>{
       e.stopPropagation();
-      // フォロー解除
-      database.ref("users/"+currentUser.uid+"/following").once("value").then(snap=>{
-        let arr = snap.val()||[];
-        arr = arr.filter(uid=>uid!==user.id);
+      database.ref("users/"+currentUser.uid+"/following").once("value").then(s=>{
+        let arr=s.val()||[];
+        if(!arr.includes(user.id)){
+          arr.push(user.id);
+        }
         database.ref("users/"+currentUser.uid+"/following").set(arr);
       });
     };
+
     div.appendChild(btn);
   }
 
-  div.onclick = ()=> location.href="dm.html?opponentId="+user.id;
+  /* --- フォロー中 --- */
+  if(mode==="follow"){
+    const btn=document.createElement("button");
+    btn.className="followBtn";
+    btn.textContent="解除";
+
+    btn.onclick=(e)=>{
+      e.stopPropagation();
+      database.ref("users/"+currentUser.uid+"/following").once("value").then(s=>{
+        let arr=s.val()||[];
+        arr = arr.filter(id=>id !== user.id);
+        database.ref("users/"+currentUser.uid+"/following").set(arr);
+      });
+    };
+
+    div.appendChild(btn);
+  }
+
+  div.onclick = ()=>{
+    location.href = "dm.html?opponentId="+user.id;
+  };
+
   return div;
 }
 
+/* --------------------
+  表示処理
+--------------------- */
 function displayChats(){
   chatListDiv.innerHTML="";
-  chatData.forEach(u=>chatListDiv.appendChild(createUserDiv(u)));
+  chatData.forEach(u=>{
+    chatListDiv.appendChild(createUserDiv(u, "chat"));
+  });
 }
 
 function displayFollows(){
   followListDiv.innerHTML="";
-  followData.forEach(u=>followListDiv.appendChild(createUserDiv(u,true)));
+  followData.forEach(u=>{
+    followListDiv.appendChild(createUserDiv(u, "follow"));
+  });
 }
 
+/* --------------------
+  検索機能（フォローボタン付き）
+--------------------- */
 searchBar.addEventListener("input", ()=>{
   const kw=searchBar.value.trim().toLowerCase();
-  if(!kw){ searchResultsDiv.style.display='none'; return; }
+  if(!kw){
+    searchResultsDiv.style.display='none';
+    return;
+  }
+
   searchResultsDiv.style.display='block';
   searchResultsDiv.innerHTML="";
+
   database.ref("users").once("value").then(snap=>{
-    const users=snap.val()||{};
+    const users = snap.val() || {};
     for(const uid in users){
+      if(uid===currentUser.uid) continue;
+
       const u=users[uid];
-      if(!u||uid===currentUser.uid) continue;
       const name=(u.displayName||"").toLowerCase();
-      const email=(u.email||"").toLowerCase();
-      if(uid.toLowerCase().includes(kw)||name.includes(kw)||email.includes(kw)){
-        const tempDiv=createUserDiv({id:uid, displayName:u.displayName, photoURL:u.photoURL||"https://via.placeholder.com/40"});
-        searchResultsDiv.appendChild(tempDiv);
+      if(name.includes(kw)||uid.includes(kw)){
+        searchResultsDiv.appendChild(
+          createUserDiv(
+            {id:uid, displayName:u.displayName, photoURL:u.photoURL||"https://via.placeholder.com/40"},
+            "search"
+          )
+        );
       }
     }
   });
