@@ -1,80 +1,96 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>MyChat - DM</title>
-  <style>
-    body { font-family:sans-serif; padding:20px; }
-    #messages { height:400px; overflow-y:scroll; border:1px solid #ccc; margin:10px auto; max-width:400px; padding:10px; }
-    #msgInput { width:300px; padding:5px; }
-    button { padding:5px 10px; }
-  </style>
-
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, getDoc, doc, addDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
-      authDomain: "chatapp-hassu.firebaseapp.com",
-      databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "chatapp-hassu",
-      storageBucket: "chatapp-hassu.appspot.com",
-      messagingSenderId: "8489684752",
-      appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const opponentId = urlParams.get("opponentId");
-
-    const messagesDiv = document.getElementById("messages");
-    const msgInput = document.getElementById("msgInput");
-    const sendBtn = document.getElementById("sendBtn");
-
-    onAuthStateChanged(auth, async (user) => {
-      if(!user){ location.href="index.html"; return; }
-
-      // 相手存在チェック
-      const userRef = doc(db,"users",opponentId);
-      const userSnap = await getDoc(userRef);
-      if(!userSnap.exists() || userSnap.data().active === false){
-        location.href="chat.html";
-        return;
-      }
-
-      sendBtn.onclick = async ()=>{
-        const content = msgInput.value;
-        if(!content) return;
-        const chatRef = collection(db,"chats",user.uid,"list");
-        await addDoc(chatRef,{ lastMessage: content, timestamp: Date.now() });
-        msgInput.value = "";
-        loadMessages(user.uid);
-      };
-
-      loadMessages(user.uid);
-    });
-
-    async function loadMessages(currentUserId){
-      const chatRef = collection(db,"chats",currentUserId,"list");
-      const chatSnap = await getDocs(chatRef);
-      messagesDiv.innerHTML = "";
-      for(const docSnap of chatSnap.docs){
-        if(docSnap.id!==opponentId) continue;
-        const data = docSnap.data();
-        messagesDiv.innerHTML += `<p>${opponentId}: ${data.lastMessage}</p>`;
-      }
-    }
-  </script>
+<meta charset="utf-8">
+<title>MyChat - DM</title>
+<style>
+  body { font-family:sans-serif; padding:20px; }
+  #messages { height:400px; overflow-y:scroll; border:1px solid #ccc; padding:10px; margin-bottom:10px; }
+  #msgInput { width:200px; padding:5px; }
+  button { padding:5px 10px; }
+  .myMsg { text-align:right; }
+  .otherMsg { text-align:left; }
+  .msgIcon { width:25px; height:25px; border-radius:50%; vertical-align:middle; margin-right:5px; }
+</style>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
 <body>
-  <h2>DM</h2>
-  <div id="messages"></div>
-  <input type="text" id="msgInput" placeholder="メッセージ入力…">
-  <button id="sendBtn">送信！</button>
+<h2>DM</h2>
+<div id="messages"></div>
+<input type="text" id="msgInput" placeholder="メッセージ…">
+<button id="sendBtn">送信</button>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
+  authDomain: "chatapp-hassu.firebaseapp.com",
+  databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "chatapp-hassu",
+  storageBucket: "chatapp-hassu.appspot.com",
+  messagingSenderId: "8489684752",
+  appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const database = firebase.database();
+
+const params = new URLSearchParams(window.location.search);
+const opponentId = params.get("opponentId");
+
+if(!opponentId) alert("opponentId がありません");
+
+const messagesDiv = document.getElementById("messages");
+const msgInput = document.getElementById("msgInput");
+const sendBtn = document.getElementById("sendBtn");
+
+let currentUser = null;
+let opponentData = null;
+
+auth.onAuthStateChanged(user=>{
+  if(!user){ location.href="index.html"; return; }
+  currentUser = user;
+  database.ref("users/"+opponentId).once("value").then(snap=>{
+    opponentData = snap.val();
+    if(!opponentData) alert("相手が存在しません");
+    startListening();
+  });
+});
+
+function startListening(){
+  database.ref(`messages/${getChatId()}`).on("value", snap=>{
+    const msgs = snap.val() || {};
+    messagesDiv.innerHTML = "";
+    Object.values(msgs).sort((a,b)=>a.timestamp-b.timestamp).forEach(m=>{
+      const div = document.createElement("div");
+      div.className = m.sender===currentUser.uid ? "myMsg" : "otherMsg";
+      const icon = m.sender===currentUser.uid ? currentUser.photoURL : opponentData.photoURL;
+      div.innerHTML = `<img src="${icon||'https://via.placeholder.com/25'}" class="msgIcon"> ${m.content} <small>${new Date(m.timestamp).toLocaleTimeString()}</small>`;
+      messagesDiv.appendChild(div);
+    });
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  });
+}
+
+function getChatId(){
+  return currentUser.uid < opponentId ? currentUser.uid+"_"+opponentId : opponentId+"_"+currentUser.uid;
+}
+
+sendBtn.onclick = ()=>{
+  const content = msgInput.value;
+  if(!content) return;
+  const chatId = getChatId();
+  database.ref(`messages/${chatId}`).push({
+    sender: currentUser.uid,
+    content: content,
+    timestamp: Date.now()
+  });
+  database.ref(`chats/${currentUser.uid}/list/${opponentId}`).set({lastMessage: content});
+  database.ref(`chats/${opponentId}/list/${currentUser.uid}`).set({lastMessage: content});
+  msgInput.value="";
+};
+</script>
 </body>
 </html>
