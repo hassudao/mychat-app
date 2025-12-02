@@ -1,246 +1,36 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-<meta charset="UTF-8" />
-
-<title>DM</title>
-
+<meta charset="utf-8">
+<title>MyChat - DM</title>
 <style>
-:root {
-  --bg: #ffffff;
-  --text: #000000;
-  --bubble-my: #cfe9ff;
-  --bubble-other: #f1f1f1;
-  --input-bg: #ffffff;
-}
-[data-dark="true"] {
-  --bg: #121212;
-  --text: #eaeaea;
-  --bubble-my: #1f3b4d;
-  --bubble-other: #2a2a2a;
-  --input-bg: #1e1e1e;
-}
-
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: sans-serif;
-  height: 100vh;
-  overflow: hidden;
-}
-
-/* 上部固定バー */
-.header {
-  position: fixed;
-  top: 0;
-  width: 100%;
-  height: 56px;
-  background: var(--bg);
-  border-bottom: 1px solid #ccc;
-  display: flex;
-  align-items: center;
-  padding: 0 10px;
-  z-index: 10;
-}
-.header button {
-  background: none;
-  border: none;
-  font-size: 18px;
-  margin-right: 10px;
-  color: var(--text);
-}
-.header-title {
-  font-size: 18px;
-  font-weight: bold;
-}
-
-/* メッセージ一覧 */
-#messages {
-  padding: 70px 10px 80px;
-  overflow-y: auto;
-  height: calc(100vh - 140px);
-}
-
-/* 日付区切り */
-.date-separator {
-  text-align: center;
-  margin: 20px 0 14px;
-  font-size: 12px;
-  color: #888;
-}
-
-/* メッセージ右寄せ・左寄せ */
-.my-message {
-  display: flex;
-  justify-content: flex-end;
-  margin: 6px 0;
-}
-.other-message {
-  display: flex;
-  justify-content: flex-start;
-  margin: 6px 0;
-}
-
-.bubble {
-  max-width: 70%;
-  padding: 10px 12px;
-  border-radius: 16px;
-  font-size: 14px;
+  .msg {
   position: relative;
-  background: var(--bubble-other);
-  color: var(--text);
-  word-break: break-word;
-}
-.my-message .bubble {
-  background: var(--bubble-my);
+  max-width: 70%;
+  padding: 8px 12px 4px 12px;
+  border-radius: 15px;
+  margin-bottom: 4px;
+  line-height: 1.4;
 }
 
-/* 時間 */
-.time {
-  margin-top: 4px;
-  font-size: 10px;
-  opacity: 0.6;
+.msgTimeInside {
+  display: block;
   text-align: right;
+  font-size: 0.65em;
+  opacity: 0.5;
+  margin-top: 2px;
 }
-
-/* 下部入力欄 */
-.input-area {
-  position: fixed;
-  bottom: 0;
-  width: 100%;
-  height: 65px;
-  background: var(--input-bg);
-  border-top: 1px solid #ccc;
-  display: flex;
-  padding: 10px;
-  box-sizing: border-box;
-}
-.input-area input {
-  flex: 1;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #aaa;
-  background: var(--bg);
-  color: var(--text);
-}
-.input-area button {
-  margin-left: 10px;
-  padding: 0 14px;
-  border: none;
-  border-radius: 8px;
-  background: #4da3ff;
-  color: white;
-  font-weight: bold;
-}
-</style>
-</head>
-
-<body id="root">
-
-<!-- 上部バー -->
-<div class="header">
-  <button onclick="goBack()">←</button>
-  <div class="header-title" id="chatName">相手の名前</div>
-  <button style="margin-left:auto;" onclick="openSettings()">⚙️</button>
-</div>
-
-<!-- メッセージ -->
-<div id="messages"></div>
-
-<!-- 入力欄 -->
-<div class="input-area">
-  <input id="msgInput" placeholder="メッセージを入力…" />
-  <button onclick="sendMessage()">送信</button>
-</div>
-
-
-<script>
-// =========================
-// DM 表示ロジック
-// =========================
-
-function formatDate(ts) {
-  const d = new Date(ts);
-  return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;
-}
-
-let lastDate = null;
-
-// Firestore想定
-// currentUserUid, chatPartnerUid はどこかでセットしてね
-// db.collection("dm").doc(dmId).collection("messages") …など
-
-function renderMessage(msg, mine) {
-  const box = document.getElementById("messages");
-  const msgDate = formatDate(msg.timestamp);
-
-  // ▼ 日付区切り
-  if (msgDate !== lastDate) {
-    const sep = document.createElement("div");
-    sep.className = "date-separator";
-    sep.textContent = msgDate;
-    box.appendChild(sep);
-    lastDate = msgDate;
-  }
-
-  // ▼ メッセージ
-  const wrap = document.createElement("div");
-  wrap.className = mine ? "my-message" : "other-message";
-
-  wrap.innerHTML = `
-    <div class="bubble">
-      ${msg.text}
-      <div class="time">${msg.time}</div>
-    </div>
-  `;
-
-  box.appendChild(wrap);
-}
-
-function loadMessages() {
-  db.collection("dm").doc(dmId).collection("messages")
-    .orderBy("timestamp")
-    .onSnapshot(snap => {
-      const box = document.getElementById("messages");
-      box.innerHTML = "";
-      lastDate = null;
-
-      snap.forEach(doc => {
-        const m = doc.data();
-        renderMessage(m, m.uid === currentUserUid);
-      });
-
-      box.scrollTop = box.scrollHeight;
-    });
-}
-
-function sendMessage() {
-  const input = document.getElementById("msgInput");
-  const text = input.value.trim();
-  if (!text) return;
-
-  const now = new Date();
-  const time = `${now.getHours()}:${String(now.getMinutes()).padStart(2, "0")}`;
-
-  db.collection("dm").doc(dmId).collection("messages").add({
-    text,
-    uid: currentUserUid,
-    timestamp: now.getTime(),
-    time,
-  });
-
-  input.value = "";
-}
-
-function goBack() {
-  location.href = "dm_list.html";
-}
-
-function openSettings() {
-  location.href = "dm_settings.html";
-}
-</script>
-
-</body>
-</html>
+  body { font-family:sans-serif; margin:0; display:flex; flex-direction:column; height:100vh; transition: background 0.3s, color 0.3s; }
+  body.dark { background:#121212; color:#f0f0f0; }
+  
+  header {
+    position:fixed;
+    top:0;
+    width:100%;
+    background:#6200ea; 
+    color:white; 
+    padding:10px; 
+    display:flex; 
+    align-items:center; 
+    justify-content:space-between;
+    z-index:1000;
