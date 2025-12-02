@@ -4,78 +4,30 @@
 <meta charset="utf-8">
 <title>MyChat - DM</title>
 <style>
-  .msg {
-  position: relative;
-  max-width: 70%;
-  padding: 8px 12px 4px 12px;
-  border-radius: 15px;
-  margin-bottom: 4px;
-  line-height: 1.4;
-}
-
-.msgTimeInside {
-  display: block;
-  text-align: right;
-  font-size: 0.65em;
-  opacity: 0.5;
-  margin-top: 2px;
-}
   body { font-family:sans-serif; margin:0; display:flex; flex-direction:column; height:100vh; transition: background 0.3s, color 0.3s; }
   body.dark { background:#121212; color:#f0f0f0; }
-  
+
   header {
-    position:fixed;
-    top:0;
-    width:100%;
-    background:#6200ea; 
-    color:white; 
-    padding:10px; 
-    display:flex; 
-    align-items:center; 
-    justify-content:space-between;
-    z-index:1000;
+    position:fixed; top:0; width:100%; background:#6200ea; color:white; padding:10px; display:flex; align-items:center; justify-content:space-between; z-index:1000;
   }
   header .left { display:flex; align-items:center; gap:10px; }
   header img { width:40px; height:40px; border-radius:50%; }
 
-  #messages { 
-    flex:1; 
-    overflow-y:auto; 
-    padding:70px 10px 70px 10px; /* ヘッダーと入力欄分の余白 */
-    display:flex; 
-    flex-direction:column; 
-    gap:10px; 
-  }
+  #messages { flex:1; overflow-y:auto; padding:70px 10px 70px 10px; display:flex; flex-direction:column; gap:10px; }
+  .date-separator { text-align:center; font-size:0.8em; opacity:0.6; margin:10px 0; }
 
   .msgContainer { display:flex; align-items:flex-end; gap:8px; }
-  .msg { max-width:70%; padding:8px 12px; border-radius:15px; word-wrap:break-word; }
+  .msg { max-width:70%; padding:8px 12px; border-radius:15px; word-wrap:break-word; position:relative; }
   .myMsg { background:#6200ea; color:white; margin-left:auto; border-bottom-right-radius:3px; }
   .otherMsg { background:#e0e0e0; color:black; margin-right:auto; border-bottom-left-radius:3px; }
 
   .msgIcon { width:35px; height:35px; border-radius:50%; vertical-align:middle; }
-  .msgTime { font-size:0.7em; color:#555; margin-left:5px; }
-  .msgRead { font-size:0.7em; color:#555; margin-left:5px; }
+  .msgTimeInside { display:block; text-align:right; font-size:0.65em; opacity:0.5; margin-top:2px; }
+  .delBtn { cursor:pointer; font-size:1.1em; margin-right:5px; user-select:none; }
 
-  footer { 
-    position:fixed; 
-    bottom:0; 
-    width:100%; 
-    padding:10px; 
-    display:flex; 
-    gap:5px; 
-    border-top:1px solid #ccc; 
-    background:white;
-    transition: background 0.3s, color 0.3s;
-  }
+  footer { position:fixed; bottom:0; width:100%; padding:10px; display:flex; gap:5px; border-top:1px solid #ccc; background:white; transition: background 0.3s, color 0.3s; }
   body.dark footer { background:#1e1e1e; }
-
-  #msgInput { 
-    flex:1; 
-    padding:8px; 
-    border-radius:20px; 
-    border:1px solid #ccc; 
-    transition: background 0.3s, color 0.3s, border-color 0.3s;
-  }
+  #msgInput { flex:1; padding:8px; border-radius:20px; border:1px solid #ccc; transition: background 0.3s, color 0.3s, border-color 0.3s; }
   body.dark #msgInput { background:#2c2c2c; color:white; border-color:#555; }
 
   button { padding:8px 12px; border:none; border-radius:20px; background:#6200ea; color:white; cursor:pointer; }
@@ -151,91 +103,103 @@ auth.onAuthStateChanged(user=>{
   });
 });
 
-// 戻るボタン
 backBtn.onclick = ()=> location.href="chat.html";
-
-// 設定ボタン
 settingsBtn.onclick = ()=> location.href="dm-settings.html?opponentId="+opponentId;
 
 function getChatId(){ return currentUser.uid < opponentId ? currentUser.uid+"_"+opponentId : opponentId+"_"+currentUser.uid; }
 
+function formatDate(ts){
+  const d = new Date(ts);
+  return d.getFullYear()+"-"+(d.getMonth()+1).toString().padStart(2,"0")+"-"+d.getDate().toString().padStart(2,"0");
+}
+
 function startListening(){
   const chatRef = database.ref(`messages/${getChatId()}`);
+  let lastDate = "";
   chatRef.on("value", snap=>{
     const msgs = snap.val() || {};
     messagesDiv.innerHTML = "";
-Object.entries(msgs)
-Object.entries(msgs)
-  .sort((a,b)=>a[1].timestamp - b[1].timestamp)
-  .forEach(([key, m])=>{
-
-    const msgDate = formatDate(m.timestamp);
-
-    if(msgDate !== lastDate){
-      const sep = document.createElement("div");
-      sep.className = "date-separator";
-      sep.textContent = msgDate;
-      messagesDiv.appendChild(sep);
-      lastDate = msgDate;
-    }
-
-    const div = document.createElement("div");
-    div.className = "msgContainer";
-
-    // ★ ゴミ箱の追加（自分のメッセージのみ表示）
-    if(m.sender === currentUser.uid) {
-      const delBtn = document.createElement("span");
-      delBtn.textContent = "🗑";
-      delBtn.style.cursor = "pointer";
-      delBtn.style.fontSize = "1.1em";
-      delBtn.onclick = () => {
-        if(confirm("このメッセージを削除しますか？")){
-          database.ref(`messages/${getChatId()}/${key}`).remove();
+    Object.entries(msgs)
+      .sort((a,b)=>a[1].timestamp - b[1].timestamp)
+      .forEach(([key, m])=>{
+        const msgDate = formatDate(m.timestamp);
+        if(msgDate !== lastDate){
+          const sep = document.createElement("div");
+          sep.className = "date-separator";
+          sep.textContent = msgDate;
+          messagesDiv.appendChild(sep);
+          lastDate = msgDate;
         }
-      };
-      div.appendChild(delBtn);
-    }
 
-    const msgDiv = document.createElement("div");
-    msgDiv.className = m.sender===currentUser.uid ? "msg myMsg" : "msg otherMsg";
+        const div = document.createElement("div");
+        div.className = "msgContainer";
 
-    const textSpan = document.createElement("span");
-    textSpan.textContent = m.content;
-    msgDiv.appendChild(textSpan);
+        // 削除ボタン（自分のメッセージのみ）
+        if(m.sender === currentUser.uid){
+          const delBtn = document.createElement("span");
+          delBtn.className = "delBtn";
+          delBtn.textContent = "🗑";
+          delBtn.onclick = ()=>{
+            if(confirm("このメッセージを削除しますか？")){
+              database.ref(`messages/${getChatId()}/${key}`).remove();
+            }
+          };
+          div.appendChild(delBtn);
+        }
 
-    const timeSpan = document.createElement("span");
-    timeSpan.className = "msgTimeInside";
-    timeSpan.textContent = new Date(m.timestamp)
-        .toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        const msgDiv = document.createElement("div");
+        msgDiv.className = m.sender===currentUser.uid ? "msg myMsg" : "msg otherMsg";
 
-    // ★ 自分のメッセージは既読表示をつける
-    if(m.sender === currentUser.uid && m.read === true){
-      const readSpan = document.createElement("span");
-      readSpan.style.fontSize = "0.65em";
-      readSpan.style.opacity = "0.5";
-      readSpan.textContent = "（既読）";
-      timeSpan.appendChild(readSpan);
-    }
+        const textSpan = document.createElement("span");
+        textSpan.textContent = m.content;
+        msgDiv.appendChild(textSpan);
 
-    msgDiv.appendChild(timeSpan);
+        const timeSpan = document.createElement("span");
+        timeSpan.className = "msgTimeInside";
+        timeSpan.textContent = new Date(m.timestamp)
+          .toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
 
-    const iconImg = document.createElement("img");
-    iconImg.className="msgIcon";
-    iconImg.src = m.sender===currentUser.uid ?
-      (currentUser.photoURL || "https://via.placeholder.com/35") :
-      (opponentData.photoURL || "https://via.placeholder.com/35");
+        // 既読表示
+        if(m.sender === currentUser.uid && m.read === true){
+          const readSpan = document.createElement("span");
+          readSpan.style.fontSize = "0.65em";
+          readSpan.style.opacity = "0.5";
+          readSpan.textContent = "（既読）";
+          timeSpan.appendChild(readSpan);
+        }
 
-    if(m.sender===currentUser.uid){
-      div.appendChild(msgDiv);
-      div.appendChild(iconImg);
-    } else {
-      div.appendChild(iconImg);
-      div.appendChild(msgDiv);
-    }
+        msgDiv.appendChild(timeSpan);
 
-    messagesDiv.appendChild(div);
-  });
+        const iconImg = document.createElement("img");
+        iconImg.className="msgIcon";
+        iconImg.src = m.sender===currentUser.uid ? 
+          (currentUser.photoURL || "https://via.placeholder.com/35") :
+          (opponentData.photoURL || "https://via.placeholder.com/35");
+
+        if(m.sender===currentUser.uid){
+          div.appendChild(msgDiv);
+          div.appendChild(iconImg);
+        } else {
+          div.appendChild(iconImg);
+          div.appendChild(msgDiv);
+        }
+
+        messagesDiv.appendChild(div);
+      });
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    markAsRead();
+  });
+}
+
+// 自分以外のメッセージを既読に
+function markAsRead(){
+  const chatId = getChatId();
+  database.ref(`messages/${chatId}`).once("value", snap=>{
+    snap.forEach(s=>{
+      if(s.val().sender !== currentUser.uid && !s.val().read){
+        database.ref(`messages/${chatId}/${s.key}/read`).set(true);
+      }
+    });
   });
 }
 
