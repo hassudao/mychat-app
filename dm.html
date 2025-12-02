@@ -165,45 +165,76 @@ function startListening(){
     const msgs = snap.val() || {};
     messagesDiv.innerHTML = "";
 Object.entries(msgs)
-  .sort((a,b)=>a[1].timestamp-b[1].timestamp)
-  .forEach(([key,m])=>{
+Object.entries(msgs)
+  .sort((a,b)=>a[1].timestamp - b[1].timestamp)
+  .forEach(([key, m])=>{
+
+    const msgDate = formatDate(m.timestamp);
+
+    if(msgDate !== lastDate){
+      const sep = document.createElement("div");
+      sep.className = "date-separator";
+      sep.textContent = msgDate;
+      messagesDiv.appendChild(sep);
+      lastDate = msgDate;
+    }
+
     const div = document.createElement("div");
     div.className = "msgContainer";
+
+    // ★ ゴミ箱の追加（自分のメッセージのみ表示）
+    if(m.sender === currentUser.uid) {
+      const delBtn = document.createElement("span");
+      delBtn.textContent = "🗑";
+      delBtn.style.cursor = "pointer";
+      delBtn.style.fontSize = "1.1em";
+      delBtn.onclick = () => {
+        if(confirm("このメッセージを削除しますか？")){
+          database.ref(`messages/${getChatId()}/${key}`).remove();
+        }
+      };
+      div.appendChild(delBtn);
+    }
 
     const msgDiv = document.createElement("div");
     msgDiv.className = m.sender===currentUser.uid ? "msg myMsg" : "msg otherMsg";
 
-    // 先に本文
     const textSpan = document.createElement("span");
     textSpan.textContent = m.content;
     msgDiv.appendChild(textSpan);
 
-    // ★本文の下に薄い時刻
     const timeSpan = document.createElement("span");
     timeSpan.className = "msgTimeInside";
-    timeSpan.textContent = new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    timeSpan.textContent = new Date(m.timestamp)
+        .toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+
+    // ★ 自分のメッセージは既読表示をつける
+    if(m.sender === currentUser.uid && m.read === true){
+      const readSpan = document.createElement("span");
+      readSpan.style.fontSize = "0.65em";
+      readSpan.style.opacity = "0.5";
+      readSpan.textContent = "（既読）";
+      timeSpan.appendChild(readSpan);
+    }
+
     msgDiv.appendChild(timeSpan);
 
-    // アイコン
     const iconImg = document.createElement("img");
     iconImg.className="msgIcon";
-    iconImg.src = m.sender===currentUser.uid ? 
+    iconImg.src = m.sender===currentUser.uid ?
       (currentUser.photoURL || "https://via.placeholder.com/35") :
       (opponentData.photoURL || "https://via.placeholder.com/35");
 
-    // 左右振り分け
     if(m.sender===currentUser.uid){
-      div.classList.add("right");
       div.appendChild(msgDiv);
       div.appendChild(iconImg);
     } else {
-      div.classList.add("left");
       div.appendChild(iconImg);
       div.appendChild(msgDiv);
     }
 
     messagesDiv.appendChild(div);
-});
+  });
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   });
 }
