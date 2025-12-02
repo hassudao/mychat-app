@@ -28,151 +28,171 @@
   <span id="notifCount"></span>
   <div id="chatList"></div>
 
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
-      authDomain: "chatapp-hassu.firebaseapp.com",
-      databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "chatapp-hassu",
-      storageBucket: "chatapp-hassu.appspot.com",
-      messagingSenderId: "8489684752",
-      appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
-    };
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
+  authDomain: "chatapp-hassu.firebaseapp.com",
+  databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "chatapp-hassu",
+  storageBucket: "chatapp-hassu.appspot.com",
+  messagingSenderId: "8489684752",
+  appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
+};
 
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const database = firebase.database();
-    const firestore = firebase.firestore();
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const database = firebase.database();
+const firestore = firebase.firestore();
 
-    const chatListDiv = document.getElementById("chatList");
-    const searchBar = document.getElementById("searchBar");
-    const darkToggle = document.getElementById("darkToggle");
-    const notifCountSpan = document.getElementById("notifCount");
+const chatListDiv = document.getElementById("chatList");
+const searchBar = document.getElementById("searchBar");
+const darkToggle = document.getElementById("darkToggle");
+const notifCountSpan = document.getElementById("notifCount");
 
-    let currentUser = null;
-    let chatListListener = null;
+let currentUser = null;
+let chatListListener = null;
 
-    if(localStorage.getItem("darkMode")==="true") document.body.classList.add("dark");
-    darkToggle.onclick = ()=>{
-      document.body.classList.toggle("dark");
-      localStorage.setItem("darkMode", document.body.classList.contains("dark"));
-    };
+if(localStorage.getItem("darkMode")==="true") document.body.classList.add("dark");
+darkToggle.onclick = ()=>{
+  document.body.classList.toggle("dark");
+  localStorage.setItem("darkMode", document.body.classList.contains("dark"));
+};
 
-    auth.onAuthStateChanged(user=>{
-      if(!user){ location.href="index.html"; return; }
-      currentUser = user;
-      startChatListListener();
-      loadNotifications();
-    });
+auth.onAuthStateChanged(user=>{
+  if(!user){ location.href="index.html"; return; }
+  currentUser = user;
+  startChatListListener();
+  loadNotifications();
+});
 
-    function startChatListListener(){
-      if(chatListListener) chatListListener.off();
+function startChatListListener(){
+  if(chatListListener) chatListListener.off();
 
-      const chatRef = database.ref("chats/"+currentUser.uid+"/list");
-      chatListListener = chatRef;
-      chatRef.on("value", snapshot=>{
-        const data = snapshot.val() || {};
-        const list = [];
-        const promises = [];
+  const chatRef = database.ref("chats/"+currentUser.uid+"/list");
+  chatListListener = chatRef;
+  chatRef.on("value", snapshot=>{
+    const data = snapshot.val() || {};
+    const list = [];
+    const promises = [];
 
-        for(const opponentId in data){
-          promises.push(
-            database.ref("users/"+opponentId).once("value").then(userSnap=>{
-              const userData = userSnap.val();
-              if(!userData) {
-                database.ref("chats/"+currentUser.uid+"/list/"+opponentId).remove();
-                return;
-              }
-              list.push({
-                id: opponentId,
-                lastMessage: data[opponentId].lastMessage,
-                displayName: userData.displayName || opponentId,
-                photoURL: userData.photoURL || "https://via.placeholder.com/40",
-                followers: userData.followers || []
-              });
-            })
-          );
-        }
-
-        Promise.all(promises).then(()=> displayChatList(list));
-      });
-    }
-
-    function displayChatList(list){
-      chatListDiv.innerHTML = "";
-      list.forEach(chat=>{
-        const div = document.createElement("div");
-        div.className="chatItem";
-
-        const infoDiv = document.createElement("div");
-        infoDiv.className="chatInfo";
-        const img = document.createElement("img");
-        img.src = chat.photoURL;
-        infoDiv.appendChild(img);
-
-        const text = document.createTextNode(`${chat.displayName} : ${chat.lastMessage||""}`);
-        infoDiv.appendChild(text);
-        div.appendChild(infoDiv);
-
-        const followBtn = document.createElement("button");
-        followBtn.className = "followBtn";
-        followBtn.textContent = chat.followers.includes(currentUser.uid) ? "フォロー中" : "フォロー";
-        followBtn.onclick = (e)=>{
-          e.stopPropagation();
-          const userRef = database.ref("users/"+chat.id+"/followers");
-          userRef.once("value").then(snap=>{
-            let arr = snap.val() || [];
-            if(arr.includes(currentUser.uid)){
-              arr = arr.filter(uid=>uid!==currentUser.uid);
-              followBtn.textContent = "フォロー";
-            } else {
-              arr.push(currentUser.uid);
-              followBtn.textContent = "フォロー中";
-            }
-            userRef.set(arr);
-            chat.followers = arr;
-          });
-        };
-        div.appendChild(followBtn);
-
-        div.onclick = ()=> location.href="dm.html?opponentId="+chat.id;
-        chatListDiv.appendChild(div);
-      });
-    }
-
-    searchBar.addEventListener("input", ()=>{
-      const kw = searchBar.value.trim().toLowerCase();
-      if(!kw){ startChatListListener(); return; }
-
-      database.ref("users").once("value").then(snapshot=>{
-        const users = snapshot.val() || {};
-        const results = [];
-        for(const uid in users){
-          const u = users[uid];
-          if(!u) continue;
-          const name = (u.displayName||"").toLowerCase();
-          const email = (u.email||"").toLowerCase();
-          if(uid.toLowerCase().includes(kw) || name.includes(kw) || email.includes(kw)){
-            results.push({
-              id: uid,
-              displayName: u.displayName,
-              photoURL: u.photoURL || "https://via.placeholder.com/40",
-              followers: u.followers || []
-            });
+    for(const opponentId in data){
+      promises.push(
+        database.ref("users/"+opponentId).once("value").then(userSnap=>{
+          const userData = userSnap.val();
+          if(!userData) {
+            // 相手アカウントが削除されていたらチャット自体を削除
+            database.ref("chats/"+currentUser.uid+"/list/"+opponentId).remove();
+            return;
           }
-        }
-        displayChatList(results);
-      });
-    });
 
-    function loadNotifications(){
-      firestore.collection("notifications").doc(currentUser.uid).collection("list")
-      .onSnapshot(snapshot=>{
-        const notifs = snapshot.docs.map(d=>d.data());
-        const unreadCount = notifs.filter(n=>!n.read).length;
-        notifCountSpan.textContent = unreadCount>0 ? `新着: ${unreadCount}` : "";
-      });
+          const chatId = currentUser.uid < opponentId ? currentUser.uid+"_"+opponentId : opponentId+"_"+currentUser.uid;
+          // 最新のメッセージ取得
+          database.ref("messages/"+chatId).orderByChild("timestamp").once("value").then(msgSnap=>{
+            const msgs = msgSnap.val() || {};
+            const keys = Object.keys(msgs).sort((a,b)=>msgs[a].timestamp - msgs[b].timestamp);
+            let lastMsg = "";
+            // 最新メッセージが削除されていれば一つ前を表示
+            for(let i=keys.length-1;i>=0;i--){
+              if(msgs[keys[i]] && !msgs[keys[i]].deleted){
+                lastMsg = msgs[keys[i]].content;
+                break;
+              }
+            }
+
+            // lastMessage 更新
+            database.ref(`chats/${currentUser.uid}/list/${opponentId}`).update({lastMessage: lastMsg});
+
+            list.push({
+              id: opponentId,
+              lastMessage: lastMsg,
+              displayName: userData.displayName || opponentId,
+              photoURL: userData.photoURL || "https://via.placeholder.com/40",
+              followers: userData.followers || []
+            });
+          });
+        })
+      );
     }
-  </script>
+
+    Promise.all(promises).then(()=> displayChatList(list));
+  });
+}
+
+function displayChatList(list){
+  chatListDiv.innerHTML = "";
+  list.forEach(chat=>{
+    const div = document.createElement("div");
+    div.className="chatItem";
+
+    const infoDiv = document.createElement("div");
+    infoDiv.className="chatInfo";
+    const img = document.createElement("img");
+    img.src = chat.photoURL;
+    infoDiv.appendChild(img);
+
+    const text = document.createTextNode(`${chat.displayName} : ${chat.lastMessage||""}`);
+    infoDiv.appendChild(text);
+    div.appendChild(infoDiv);
+
+    const followBtn = document.createElement("button");
+    followBtn.className = "followBtn";
+    followBtn.textContent = chat.followers.includes(currentUser.uid) ? "フォロー中" : "フォロー";
+    followBtn.onclick = (e)=>{
+      e.stopPropagation();
+      const userRef = database.ref("users/"+chat.id+"/followers");
+      userRef.once("value").then(snap=>{
+        let arr = snap.val() || [];
+        if(arr.includes(currentUser.uid)){
+          arr = arr.filter(uid=>uid!==currentUser.uid);
+          followBtn.textContent = "フォロー";
+        } else {
+          arr.push(currentUser.uid);
+          followBtn.textContent = "フォロー中";
+        }
+        userRef.set(arr);
+        chat.followers = arr;
+      });
+    };
+    div.appendChild(followBtn);
+
+    div.onclick = ()=> location.href="dm.html?opponentId="+chat.id;
+    chatListDiv.appendChild(div);
+  });
+}
+
+searchBar.addEventListener("input", ()=>{
+  const kw = searchBar.value.trim().toLowerCase();
+  if(!kw){ startChatListListener(); return; }
+
+  database.ref("users").once("value").then(snapshot=>{
+    const users = snapshot.val() || {};
+    const results = [];
+    for(const uid in users){
+      const u = users[uid];
+      if(!u) continue;
+      const name = (u.displayName||"").toLowerCase();
+      const email = (u.email||"").toLowerCase();
+      if(uid.toLowerCase().includes(kw) || name.includes(kw) || email.includes(kw)){
+        results.push({
+          id: uid,
+          displayName: u.displayName,
+          photoURL: u.photoURL || "https://via.placeholder.com/40",
+          followers: u.followers || []
+        });
+      }
+    }
+    displayChatList(results);
+  });
+});
+
+function loadNotifications(){
+  firestore.collection("notifications").doc(currentUser.uid).collection("list")
+  .onSnapshot(snapshot=>{
+    const notifs = snapshot.docs.map(d=>d.data());
+    const unreadCount = notifs.filter(n=>!n.read).length;
+    notifCountSpan.textContent = unreadCount>0 ? `新着: ${unreadCount}` : "";
+  });
+}
+</script>
 </body>
 </html>
