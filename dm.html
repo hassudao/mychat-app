@@ -34,3 +34,194 @@
     align-items:center; 
     justify-content:space-between;
     z-index:1000;
+  }
+  header .left { display:flex; align-items:center; gap:10px; }
+  header img { width:40px; height:40px; border-radius:50%; }
+
+  #messages { 
+    flex:1; 
+    overflow-y:auto; 
+    padding:70px 10px 70px 10px; /* ヘッダーと入力欄分の余白 */
+    display:flex; 
+    flex-direction:column; 
+    gap:10px; 
+  }
+
+  .msgContainer { display:flex; align-items:flex-end; gap:8px; }
+  .msg { max-width:70%; padding:8px 12px; border-radius:15px; word-wrap:break-word; }
+  .myMsg { background:#6200ea; color:white; margin-left:auto; border-bottom-right-radius:3px; }
+  .otherMsg { background:#e0e0e0; color:black; margin-right:auto; border-bottom-left-radius:3px; }
+
+  .msgIcon { width:35px; height:35px; border-radius:50%; vertical-align:middle; }
+  .msgTime { font-size:0.7em; color:#555; margin-left:5px; }
+  .msgRead { font-size:0.7em; color:#555; margin-left:5px; }
+
+  footer { 
+    position:fixed; 
+    bottom:0; 
+    width:100%; 
+    padding:10px; 
+    display:flex; 
+    gap:5px; 
+    border-top:1px solid #ccc; 
+    background:white;
+    transition: background 0.3s, color 0.3s;
+  }
+  body.dark footer { background:#1e1e1e; }
+
+  #msgInput { 
+    flex:1; 
+    padding:8px; 
+    border-radius:20px; 
+    border:1px solid #ccc; 
+    transition: background 0.3s, color 0.3s, border-color 0.3s;
+  }
+  body.dark #msgInput { background:#2c2c2c; color:white; border-color:#555; }
+
+  button { padding:8px 12px; border:none; border-radius:20px; background:#6200ea; color:white; cursor:pointer; }
+</style>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+
+<body>
+<header>
+  <div class="left">
+    <button id="backBtn">◀一覧</button>
+    <img id="opponentIcon" src="https://via.placeholder.com/40">
+    <span id="opponentName">ユーザー</span>
+  </div>
+  <button id="settingsBtn">⚙️ 設定</button>
+</header>
+
+<div id="messages"></div>
+
+<footer>
+  <input type="text" id="msgInput" placeholder="メッセージを入力...">
+  <button id="sendBtn">送信</button>
+</footer>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
+  authDomain: "chatapp-hassu.firebaseapp.com",
+  databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "chatapp-hassu",
+  storageBucket: "chatapp-hassu.appspot.com",
+  messagingSenderId: "8489684752",
+  appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const database = firebase.database();
+
+const params = new URLSearchParams(window.location.search);
+const opponentId = params.get("opponentId");
+
+const messagesDiv = document.getElementById("messages");
+const msgInput = document.getElementById("msgInput");
+const sendBtn = document.getElementById("sendBtn");
+const opponentIconImg = document.getElementById("opponentIcon");
+const opponentNameSpan = document.getElementById("opponentName");
+const backBtn = document.getElementById("backBtn");
+const settingsBtn = document.getElementById("settingsBtn");
+
+let currentUser = null;
+let opponentData = null;
+
+// ダークモード適用
+function applyDMSettings(){
+  if(localStorage.getItem("dmDarkMode")==="true") document.body.classList.add("dark");
+  else document.body.classList.remove("dark");
+}
+applyDMSettings();
+
+auth.onAuthStateChanged(user=>{
+  if(!user){ location.href="index.html"; return; }
+  currentUser = user;
+  database.ref("users/"+opponentId).once("value").then(snap=>{
+    opponentData = snap.val();
+    if(!opponentData) alert("相手が存在しません");
+    opponentIconImg.src = opponentData.photoURL || "https://via.placeholder.com/40";
+    opponentNameSpan.textContent = opponentData.displayName || "ユーザー";
+    startListening();
+  });
+});
+
+// 戻るボタン
+backBtn.onclick = ()=> location.href="chat.html";
+
+// 設定ボタン
+settingsBtn.onclick = ()=> location.href="dm-settings.html?opponentId="+opponentId;
+
+function getChatId(){ return currentUser.uid < opponentId ? currentUser.uid+"_"+opponentId : opponentId+"_"+currentUser.uid; }
+
+function startListening(){
+  const chatRef = database.ref(`messages/${getChatId()}`);
+  chatRef.on("value", snap=>{
+    const msgs = snap.val() || {};
+    messagesDiv.innerHTML = "";
+Object.entries(msgs)
+  .sort((a,b)=>a[1].timestamp-b[1].timestamp)
+  .forEach(([key,m])=>{
+    const div = document.createElement("div");
+    div.className = "msgContainer";
+
+    const msgDiv = document.createElement("div");
+    msgDiv.className = m.sender===currentUser.uid ? "msg myMsg" : "msg otherMsg";
+
+    // 先に本文
+    const textSpan = document.createElement("span");
+    textSpan.textContent = m.content;
+    msgDiv.appendChild(textSpan);
+
+    // ★本文の下に薄い時刻
+    const timeSpan = document.createElement("span");
+    timeSpan.className = "msgTimeInside";
+    timeSpan.textContent = new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    msgDiv.appendChild(timeSpan);
+
+    // アイコン
+    const iconImg = document.createElement("img");
+    iconImg.className="msgIcon";
+    iconImg.src = m.sender===currentUser.uid ? 
+      (currentUser.photoURL || "https://via.placeholder.com/35") :
+      (opponentData.photoURL || "https://via.placeholder.com/35");
+
+    // 左右振り分け
+    if(m.sender===currentUser.uid){
+      div.classList.add("right");
+      div.appendChild(msgDiv);
+      div.appendChild(iconImg);
+    } else {
+      div.classList.add("left");
+      div.appendChild(iconImg);
+      div.appendChild(msgDiv);
+    }
+
+    messagesDiv.appendChild(div);
+});
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  });
+}
+
+sendBtn.onclick = ()=>{
+  const content = msgInput.value;
+  if(!content) return;
+  const chatId = getChatId();
+  database.ref(`messages/${chatId}`).push({
+    sender: currentUser.uid,
+    content: content,
+    timestamp: Date.now(),
+    read: false
+  });
+  database.ref(`chats/${currentUser.uid}/list/${opponentId}`).set({lastMessage: content});
+  database.ref(`chats/${opponentId}/list/${currentUser.uid}`).set({lastMessage: content});
+  msgInput.value="";
+};
+</script>
+</body>
+</html>
