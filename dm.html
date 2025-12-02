@@ -148,39 +148,39 @@ function startListening(){
   chatRef.on("value", snap=>{
     const msgs = snap.val() || {};
     messagesDiv.innerHTML = "";
-    Object.entries(msgs).sort((a,b)=>a[1].timestamp-b[1].timestamp).forEach(([key,m])=>{
-      const div = document.createElement("div");
-      div.className = "msgContainer";
+Object.entries(msgs)
+  .sort((a,b)=>a[1].timestamp-b[1].timestamp)
+  .forEach(([key,m])=>{
+    const div = document.createElement("div");
+    div.className = "msgContainer";
 
-      const msgDiv = document.createElement("div");
-      msgDiv.className = m.sender===currentUser.uid ? "msg myMsg" : "msg otherMsg";
-      msgDiv.textContent = m.content;
+    const msgDiv = document.createElement("div");
+    msgDiv.className = m.sender===currentUser.uid ? "msg myMsg" : "msg otherMsg";
+    msgDiv.textContent = m.content;
 
-      const iconImg = document.createElement("img");
-      iconImg.className="msgIcon";
-      iconImg.src = m.sender===currentUser.uid ? currentUser.photoURL : opponentData.photoURL;
+    // ★吹き出し内の時間
+    const timeSpan = document.createElement("span");
+    timeSpan.className = "msgTimeInside";
+    timeSpan.textContent = new Date(m.timestamp).toLocaleTimeString();
+    msgDiv.appendChild(timeSpan);
 
-      const timeSpan = document.createElement("span");
-      timeSpan.className="msgTime";
-      timeSpan.textContent = new Date(m.timestamp).toLocaleTimeString();
+    // アイコン
+    const iconImg = document.createElement("img");
+    iconImg.className="msgIcon";
+    iconImg.src = m.sender===currentUser.uid ? 
+      (currentUser.photoURL || "https://via.placeholder.com/35") :
+      (opponentData.photoURL || "https://via.placeholder.com/35");
 
-      const readSpan = document.createElement("span");
-      readSpan.className="msgRead";
-      readSpan.textContent = (m.sender===currentUser.uid && m.read) ? "既読" : "";
+    if(m.sender===currentUser.uid){
+      div.appendChild(msgDiv);
+      div.appendChild(iconImg);
+    } else {
+      div.appendChild(iconImg);
+      div.appendChild(msgDiv);
+    }
 
-      if(m.sender===currentUser.uid){
-        div.appendChild(msgDiv);
-        div.appendChild(iconImg);
-        div.appendChild(timeSpan);
-        div.appendChild(readSpan);
-      } else {
-        div.appendChild(iconImg);
-        div.appendChild(msgDiv);
-        div.appendChild(timeSpan);
-      }
-
-      messagesDiv.appendChild(div);
-    });
+    messagesDiv.appendChild(div);
+});
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   });
 }
