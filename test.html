@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Realtime Database Test</title>
+</head>
+<body>
+  <h2>Realtime Database ユーザー確認</h2>
+  <div id="userList"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <script>
+    // Firebase設定
+    const firebaseConfig = {
+      apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
+      authDomain: "chatapp-hassu.firebaseapp.com",
+      databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "chatapp-hassu",
+      storageBucket: "chatapp-hassu.appspot.com",
+      messagingSenderId: "8489684752",
+      appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const database = firebase.database();
+
+    const userListDiv = document.getElementById("userList");
+
+    // ログイン確認（テスト用に匿名ログイン）
+    auth.signInAnonymously().catch(err => console.error(err));
+
+    auth.onAuthStateChanged(user=>{
+      if(!user) return;
+      console.log("ログインユーザー:", user.uid);
+
+      // ユーザー一覧取得
+      const usersRef = database.ref("users");
+      usersRef.once("value")
+        .then(snapshot=>{
+          const users = snapshot.val();
+          console.log("取得したユーザー一覧:", users);
+
+          userListDiv.innerHTML = "";
+          for(const uid in users){
+            const u = users[uid];
+            userListDiv.innerHTML += `<p>${uid} : ${u.name || "No Name"} / ${u.email || "No Email"} / ${u.active}</p>`;
+          }
+        })
+        .catch(err=>console.error("取得エラー:", err));
+    });
+  </script>
+</body>
+</html>
