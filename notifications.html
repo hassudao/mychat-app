@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>MyChat - 通知</title>
+  <style>
+    body { font-family:sans-serif; padding:20px; }
+    #notifList { max-width:400px; margin:auto; }
+    .notifItem { border:1px solid #ccc; padding:10px; margin-bottom:5px; }
+  </style>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getFirestore, collection, getDocs, getDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
+      authDomain: "chatapp-hassu.firebaseapp.com",
+      databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "chatapp-hassu",
+      storageBucket: "chatapp-hassu.appspot.com",
+      messagingSenderId: "8489684752",
+      appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    const notifListDiv = document.getElementById("notifList");
+
+    onAuthStateChanged(auth, async (user)=>{
+      if(!user){ location.href="index.html"; return; }
+      await cleanNotifications(user.uid);
+    });
+
+    async function cleanNotifications(userId){
+      const notiRef = collection(db,"notifications",userId,"list");
+      const snap = await getDocs(notiRef);
+
+      for(const docSnap of snap.docs){
+        const fromId = docSnap.data().from;
+        const userRef = doc(db,"users",fromId);
+        const userSnap = await getDoc(userRef);
+
+        if(!userSnap.exists() || userSnap.data().active===false){
+          await deleteDoc(doc(notiRef, docSnap.id));
+          continue;
+        }
+
+        const div = document.createElement("div");
+        div.className = "notifItem";
+        div.textContent = docSnap.data().message;
+        notifListDiv.appendChild(div);
+
+        // 自動削除（既読）
+        await deleteDoc(doc(notiRef, docSnap.id));
+      }
+    }
+  </script>
+</head>
+<body>
+  <h2>通知センター</h2>
+  <div id="notifList"></div>
+</body>
+</html>
