@@ -11,13 +11,24 @@
     .chatItem img { width:30px; height:30px; border-radius:50%; margin-right:10px; }
     #searchBar { width:300px; padding:5px; margin-bottom:10px; }
     #darkToggle { padding:5px 10px; margin-left:10px; }
+    #notifCount { font-weight:bold; margin-left:10px; color:red; }
   </style>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-    import { getFirestore, collection, doc, getDoc, onSnapshot, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+  <h2>チャット一覧</h2>
+  <input type="text" id="searchBar" placeholder="ユーザーを検索...">
+  <button id="darkToggle">ダークモード切替</button>
+  <span id="notifCount"></span>
+  <div id="chatList"></div>
 
+  <script>
+    // Firebase設定
     const firebaseConfig = {
       apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
       authDomain: "chatapp-hassu.firebaseapp.com",
@@ -28,66 +39,65 @@
       appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-    const auth = getAuth(app);
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const database = firebase.database();
+    const firestore = firebase.firestore();
 
     const chatListDiv = document.getElementById("chatList");
     const searchBar = document.getElementById("searchBar");
     const darkToggle = document.getElementById("darkToggle");
+    const notifCountSpan = document.getElementById("notifCount");
 
-    let unsubscribeChatList = null;
+    let currentUser = null;
+    let chatListListener = null;
 
-    // ダークモード初期化
-    if(localStorage.getItem("darkMode") === "true") document.body.classList.add("dark");
-
+    // ダークモード
+    if(localStorage.getItem("darkMode")==="true") document.body.classList.add("dark");
     darkToggle.onclick = ()=>{
       document.body.classList.toggle("dark");
       localStorage.setItem("darkMode", document.body.classList.contains("dark"));
     };
 
-    onAuthStateChanged(auth, async (user)=>{
+    // ログインチェック
+    auth.onAuthStateChanged(user=>{
       if(!user){ location.href="index.html"; return; }
-      window.currentUser = user;
-
-      // チャットリストをリアルタイム監視
+      currentUser = user;
       startChatListListener();
-
-      // 検索バーイベント
-      searchBar.addEventListener("input", async ()=>{
-        const kw = searchBar.value.trim().toLowerCase();
-        if(!kw){
-          startChatListListener();
-          return;
-        }
-        await searchUsers(kw);
-      });
+      loadNotifications();
     });
 
+    // リアルタイムトークリスト監視
     function startChatListListener(){
-      if(unsubscribeChatList) unsubscribeChatList();
-      const chatListRef = collection(db,"chats",currentUser.uid,"list");
+      if(chatListListener) chatListListener.off();
 
-      unsubscribeChatList = onSnapshot(chatListRef, async (snapshot)=>{
+      const chatRef = database.ref("chats/"+currentUser.uid+"/list");
+      chatListListener = chatRef;
+      chatRef.on("value", snapshot=>{
+        const data = snapshot.val() || {};
         const list = [];
-        for(const docSnap of snapshot.docs){
-          const opponentId = docSnap.id;
-          const userRef = doc(db,"users",opponentId);
-          const userSnap = await getDoc(userRef);
-          if(!userSnap.exists() || userSnap.data().active===false){
-            await deleteDoc(doc(chatListRef,opponentId));
-            continue;
-          }
-          list.push({ 
-            id: opponentId,
-            lastMessage: docSnap.data().lastMessage,
-            icon: userSnap.data().icon,
-            name: userSnap.data().name,
-            email: userSnap.data().email,
-            isFollowing: userSnap.data().followers?.includes(currentUser.uid) || false
-          });
+        const promises = [];
+
+        for(const opponentId in data){
+          promises.push(
+            database.ref("users/"+opponentId).once("value").then(userSnap=>{
+              const userData = userSnap.val();
+              if(!userData || userData.active===false){
+                database.ref("chats/"+currentUser.uid+"/list/"+opponentId).remove();
+                return;
+              }
+              list.push({
+                id: opponentId,
+                lastMessage: data[opponentId].lastMessage,
+                name: userData.name,
+                icon: userData.icon,
+                followers: userData.followers || []
+              });
+            })
+          );
         }
-        displayChatList(list);
+
+        Promise.all(promises).then(()=> displayChatList(list));
       });
     }
 
@@ -97,44 +107,48 @@
         const div = document.createElement("div");
         div.className="chatItem";
         const img = document.createElement("img");
-        img.src=chat.icon || "default_icon.png";
+        img.src = chat.icon || "default_icon.png";
         div.appendChild(img);
-        const text = document.createTextNode(`${chat.name || chat.id}${chat.isFollowing ? " (フォロー中)" : ""} : ${chat.lastMessage || ""}`);
+        const text = document.createTextNode(`${chat.name||chat.id}${chat.followers.includes(currentUser.uid) ? " (フォロー中)" : ""} : ${chat.lastMessage||""}`);
         div.appendChild(text);
-        div.onclick = ()=>{ location.href=`dm.html?opponentId=${chat.id}`; };
+        div.onclick = ()=> location.href="dm.html?opponentId="+chat.id;
         chatListDiv.appendChild(div);
       });
     }
 
-    async function searchUsers(keyword){
-      const usersRef = collection(db,"users");
-      const usersSnap = await getDocs(usersRef);
-      const results = [];
-      usersSnap.forEach(docSnap=>{
-        const data = docSnap.data();
-        if(data.active === false) return;
-        const id = docSnap.id.toLowerCase();
-        const name = (data.name||"").toLowerCase();
-        const email = (data.email||"").toLowerCase();
-        if(id.includes(keyword) || name.includes(keyword) || email.includes(keyword)){
-          results.push({
-            id: docSnap.id,
-            icon: data.icon || "default_icon.png",
-            lastMessage:"",
-            name: data.name,
-            email: data.email,
-            isFollowing: data.followers?.includes(currentUser.uid) || false
-          });
+    // ユーザー検索
+    searchBar.addEventListener("input", ()=>{
+      const kw = searchBar.value.trim().toLowerCase();
+      if(!kw){ startChatListListener(); return; }
+
+      database.ref("users").once("value").then(snapshot=>{
+        const users = snapshot.val() || {};
+        const results = [];
+        for(const uid in users){
+          const u = users[uid];
+          if(!u.active) continue;
+          if(uid.toLowerCase().includes(kw) || (u.name||"").toLowerCase().includes(kw) || (u.email||"").toLowerCase().includes(kw)){
+            results.push({
+              id: uid,
+              name: u.name,
+              icon: u.icon || "default_icon.png",
+              followers: u.followers || []
+            });
+          }
         }
+        displayChatList(results);
       });
-      displayChatList(results);
+    });
+
+    // 通知センター（Firestore）
+    function loadNotifications(){
+      firestore.collection("notifications").doc(currentUser.uid).collection("list")
+      .onSnapshot(snapshot=>{
+        const notifs = snapshot.docs.map(d=>d.data());
+        const unreadCount = notifs.filter(n=>!n.read).length;
+        notifCountSpan.textContent = unreadCount>0 ? `新着: ${unreadCount}` : "";
+      });
     }
   </script>
-</head>
-<body>
-  <h2>チャット一覧</h2>
-  <input type="text" id="searchBar" placeholder="ユーザーを検索...">
-  <button id="darkToggle">ダークモード切替</button>
-  <div id="chatList"></div>
 </body>
 </html>
