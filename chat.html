@@ -15,7 +15,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, getDoc, query, where, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, getDoc, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 
     const firebaseConfig = {
@@ -49,13 +49,14 @@
       window.currentUser = user;  // 他で使う
       loadChatList();
 
-      // 検索イベント
+      // 検索バーイベント
       searchBar.addEventListener("input", async ()=>{
-        if(!searchBar.value.trim()){ 
+        const kw = searchBar.value.trim();
+        if(!kw){ 
           loadChatList();
           return;
         }
-        await searchUsers(searchBar.value.trim());
+        await searchUsers(kw);
       });
     });
 
@@ -72,7 +73,7 @@
         const img = document.createElement("img");
         img.src=chat.icon || "default_icon.png";
         div.appendChild(img);
-        div.appendChild(document.createTextNode(chat.id + " : " + chat.lastMessage));
+        div.appendChild(document.createTextNode(chat.id + (chat.lastMessage ? " : "+chat.lastMessage : "")));
         div.onclick=()=>{ location.href=`dm.html?opponentId=${chat.id}`; };
         chatListDiv.appendChild(div);
       });
@@ -99,15 +100,24 @@
       const usersRef = collection(db,"users");
       const usersSnap = await getDocs(usersRef);
       const results = [];
+      const kw = keyword.toLowerCase();
+
       usersSnap.forEach(docSnap=>{
         const data = docSnap.data();
-        if(data.active!==false && 
-           (docSnap.id.includes(keyword) || 
-            (data.name && data.name.includes(keyword)) || 
-            (data.email && data.email.includes(keyword)))) {
-          results.push({id: docSnap.id, icon:data.icon || "default_icon.png", lastMessage:""});
+        if(data.active === false) return;
+        const id = docSnap.id.toLowerCase();
+        const name = (data.name || "").toLowerCase();
+        const email = (data.email || "").toLowerCase();
+
+        if(id.includes(kw) || name.includes(kw) || email.includes(kw)){
+          results.push({
+            id: docSnap.id,
+            icon: data.icon || "default_icon.png",
+            lastMessage:""
+          });
         }
       });
+
       displayChatList(results);
     }
 
