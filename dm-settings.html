@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>DM設定</title>
+<style>
+  body { font-family:sans-serif; padding:20px; transition: background 0.3s, color 0.3s; }
+  body.dark { background:#121212; color:#f0f0f0; }
+  label { display:block; margin-top:10px; }
+  input[type=color] { padding:5px; }
+  button { margin-top:20px; padding:8px 12px; border:none; border-radius:5px; background:#6200ea; color:white; cursor:pointer; }
+</style>
+</head>
+<body>
+<h2>DM設定</h2>
+<label>背景色:
+  <input type="color" id="bgColor">
+</label>
+<label>
+  <input type="checkbox" id="darkMode"> ダークモード
+</label>
+<button id="saveBtn">保存してDMに戻る</button>
+
+<script>
+const bgColorInput = document.getElementById("bgColor");
+const darkModeInput = document.getElementById("darkMode");
+const saveBtn = document.getElementById("saveBtn");
+
+if(localStorage.getItem("dmBg")) bgColorInput.value = localStorage.getItem("dmBg");
+if(localStorage.getItem("dmDarkMode")==="true") darkModeInput.checked = true;
+
+saveBtn.onclick = ()=>{
+  localStorage.setItem("dmBg", bgColorInput.value);
+  localStorage.setItem("dmDarkMode", darkModeInput.checked);
+  const params = new URLSearchParams(window.location.search);
+  const opponentId = params.get("opponentId");
+  location.href = "dm.html?opponentId="+opponentId;
+};
+</script>
+</body>
+</html>
