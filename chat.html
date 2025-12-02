@@ -82,15 +82,15 @@
           promises.push(
             database.ref("users/"+opponentId).once("value").then(userSnap=>{
               const userData = userSnap.val();
-              if(!userData || userData.active===false){
+              if(!userData) {
                 database.ref("chats/"+currentUser.uid+"/list/"+opponentId).remove();
                 return;
               }
               list.push({
                 id: opponentId,
                 lastMessage: data[opponentId].lastMessage,
-                name: userData.name,
-                icon: userData.icon,
+                displayName: userData.displayName || opponentId,
+                icon: userData.icon || "default_icon.png",
                 followers: userData.followers || []
               });
             })
@@ -107,9 +107,9 @@
         const div = document.createElement("div");
         div.className="chatItem";
         const img = document.createElement("img");
-        img.src = chat.icon || "default_icon.png";
+        img.src = chat.icon;
         div.appendChild(img);
-        const text = document.createTextNode(`${chat.name||chat.id}${chat.followers.includes(currentUser.uid) ? " (フォロー中)" : ""} : ${chat.lastMessage||""}`);
+        const text = document.createTextNode(`${chat.displayName}${chat.followers.includes(currentUser.uid) ? " (フォロー中)" : ""} : ${chat.lastMessage||""}`);
         div.appendChild(text);
         div.onclick = ()=> location.href="dm.html?opponentId="+chat.id;
         chatListDiv.appendChild(div);
@@ -126,11 +126,13 @@
         const results = [];
         for(const uid in users){
           const u = users[uid];
-          if(!u.active) continue;
-          if(uid.toLowerCase().includes(kw) || (u.name||"").toLowerCase().includes(kw) || (u.email||"").toLowerCase().includes(kw)){
+          if(!u) continue;
+          const name = (u.displayName||"").toLowerCase();
+          const email = (u.email||"").toLowerCase();
+          if(uid.toLowerCase().includes(kw) || name.includes(kw) || email.includes(kw)){
             results.push({
               id: uid,
-              name: u.name,
+              displayName: u.displayName,
               icon: u.icon || "default_icon.png",
               followers: u.followers || []
             });
