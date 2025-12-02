@@ -12,20 +12,14 @@
   #messages { flex:1; overflow-y:auto; padding:10px; display:flex; flex-direction:column; gap:10px; }
   .msgContainer { display:flex; align-items:flex-end; gap:8px; }
   .msg { max-width:70%; padding:8px 12px; border-radius:15px; word-wrap:break-word; }
-  .myMsg { background:#6200ea; color:white; align-self:flex-end; border-radius:15px 15px 3px 15px; }
-  .otherMsg { background:#e0e0e0; color:black; align-self:flex-start; border-radius:15px 15px 15px 3px; }
+  .myMsg { background:#6200ea; color:white; margin-left:auto; border-bottom-right-radius:3px; }
+  .otherMsg { background:#e0e0e0; color:black; margin-right:auto; border-bottom-left-radius:3px; }
   .msgIcon { width:35px; height:35px; border-radius:50%; vertical-align:middle; }
   .msgTime { font-size:0.7em; color:#555; margin-left:5px; }
   .msgRead { font-size:0.7em; color:#555; margin-left:5px; }
   footer { padding:10px; display:flex; gap:5px; border-top:1px solid #ccc; background:white; }
   #msgInput { flex:1; padding:8px; border-radius:20px; border:1px solid #ccc; }
   button { padding:8px 12px; border:none; border-radius:20px; background:#6200ea; color:white; cursor:pointer; }
-
-  /* 検索バー */
-  #searchBar { width:100%; padding:8px; border:1px solid #ccc; border-radius:20px; margin-bottom:10px; }
-  #searchResults { max-height:200px; overflow-y:auto; margin-bottom:10px; }
-  .searchItem { display:flex; align-items:center; gap:10px; padding:5px; border-bottom:1px solid #ddd; cursor:pointer; }
-  .searchItem img { width:35px; height:35px; border-radius:50%; }
 </style>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -42,10 +36,6 @@
   </div>
   <button id="settingsBtn">⚙️ 設定</button>
 </header>
-
-<!-- ユーザー検索バー -->
-<input type="text" id="searchBar" placeholder="ユーザー検索...">
-<div id="searchResults"></div>
 
 <div id="messages"></div>
 
@@ -80,27 +70,19 @@ const opponentNameSpan = document.getElementById("opponentName");
 const backBtn = document.getElementById("backBtn");
 const settingsBtn = document.getElementById("settingsBtn");
 
-const searchBar = document.getElementById("searchBar");
-const searchResults = document.getElementById("searchResults");
-
 let currentUser = null;
 let opponentData = null;
 
-// DM設定適用
+// DM設定のダークモードだけ適用
 function applyDMSettings(){
-  const bg = localStorage.getItem("dmBg") || "#f4f4f8";
-  document.body.style.background = bg;
   if(localStorage.getItem("dmDarkMode")==="true") document.body.classList.add("dark");
   else document.body.classList.remove("dark");
 }
-
 applyDMSettings();
 
 auth.onAuthStateChanged(user=>{
   if(!user){ location.href="index.html"; return; }
   currentUser = user;
-
-  // 相手情報取得
   database.ref("users/"+opponentId).once("value").then(snap=>{
     opponentData = snap.val();
     if(!opponentData) alert("相手が存在しません");
@@ -116,10 +98,8 @@ backBtn.onclick = ()=> location.href="chat.html";
 // 設定ボタン
 settingsBtn.onclick = ()=> location.href="dm-settings.html?opponentId="+opponentId;
 
-// チャットID
 function getChatId(){ return currentUser.uid < opponentId ? currentUser.uid+"_"+opponentId : opponentId+"_"+currentUser.uid; }
 
-// メッセージ受信
 function startListening(){
   const chatRef = database.ref(`messages/${getChatId()}`);
   chatRef.on("value", snap=>{
@@ -162,7 +142,6 @@ function startListening(){
   });
 }
 
-// メッセージ送信
 sendBtn.onclick = ()=>{
   const content = msgInput.value;
   if(!content) return;
@@ -177,27 +156,6 @@ sendBtn.onclick = ()=>{
   database.ref(`chats/${opponentId}/list/${currentUser.uid}`).set({lastMessage: content});
   msgInput.value="";
 };
-
-// 🔹 ユーザー検索（自分除外）
-searchBar.addEventListener("input", ()=>{
-  const query = searchBar.value.trim().toLowerCase();
-  searchResults.innerHTML = "";
-  if(!query) return;
-
-  database.ref("users").orderByChild("displayName").startAt(query).endAt(query+"\uf8ff")
-  .once("value").then(snapshot=>{
-    const users = snapshot.val() || {};
-    Object.entries(users)
-      .filter(([uid,user])=>uid!==currentUser.uid) // 自分除外
-      .forEach(([uid,user])=>{
-        const item = document.createElement("div");
-        item.className="searchItem";
-        item.innerHTML = `<img src="${user.photoURL || 'https://via.placeholder.com/40'}"><span>${user.displayName}</span>`;
-        item.onclick = ()=> location.href="dm.html?opponentId="+uid;
-        searchResults.appendChild(item);
-      });
-  });
-});
 </script>
 </body>
 </html>
