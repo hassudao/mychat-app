@@ -7,11 +7,13 @@
     body { font-family:sans-serif; padding:20px; transition: background 0.3s, color 0.3s; }
     body.dark { background:#1e1e1e; color:#f0f0f0; }
     #chatList { max-width:400px; margin:auto; }
-    .chatItem { border:1px solid #ccc; padding:10px; margin-bottom:5px; cursor:pointer; display:flex; align-items:center; }
-    .chatItem img { width:30px; height:30px; border-radius:50%; margin-right:10px; }
+    .chatItem { border:1px solid #ccc; padding:10px; margin-bottom:5px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; }
+    .chatItem img { width:40px; height:40px; border-radius:50%; margin-right:10px; }
+    .chatInfo { display:flex; align-items:center; flex:1; }
     #searchBar { width:300px; padding:5px; margin-bottom:10px; }
     #darkToggle { padding:5px 10px; margin-left:10px; }
     #notifCount { font-weight:bold; margin-left:10px; color:red; }
+    .followBtn { padding:5px 8px; cursor:pointer; }
   </style>
 
   <!-- Firebase SDK -->
@@ -28,7 +30,6 @@
   <div id="chatList"></div>
 
   <script>
-    // Firebase設定
     const firebaseConfig = {
       apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
       authDomain: "chatapp-hassu.firebaseapp.com",
@@ -52,14 +53,12 @@
     let currentUser = null;
     let chatListListener = null;
 
-    // ダークモード
     if(localStorage.getItem("darkMode")==="true") document.body.classList.add("dark");
     darkToggle.onclick = ()=>{
       document.body.classList.toggle("dark");
       localStorage.setItem("darkMode", document.body.classList.contains("dark"));
     };
 
-    // ログインチェック
     auth.onAuthStateChanged(user=>{
       if(!user){ location.href="index.html"; return; }
       currentUser = user;
@@ -67,7 +66,6 @@
       loadNotifications();
     });
 
-    // リアルタイムトークリスト監視
     function startChatListListener(){
       if(chatListListener) chatListListener.off();
 
@@ -90,7 +88,7 @@
                 id: opponentId,
                 lastMessage: data[opponentId].lastMessage,
                 displayName: userData.displayName || opponentId,
-                icon: userData.icon || "default_icon.png",
+                icon: userData.icon || "https://via.placeholder.com/40",
                 followers: userData.followers || []
               });
             })
@@ -106,11 +104,42 @@
       list.forEach(chat=>{
         const div = document.createElement("div");
         div.className="chatItem";
+
+        // アイコン＋名前
+        const infoDiv = document.createElement("div");
+        infoDiv.className="chatInfo";
         const img = document.createElement("img");
-        img.src = chat.icon;
-        div.appendChild(img);
-        const text = document.createTextNode(`${chat.displayName}${chat.followers.includes(currentUser.uid) ? " (フォロー中)" : ""} : ${chat.lastMessage||""}`);
-        div.appendChild(text);
+        img.src = chat.icon || "https://via.placeholder.com/40";
+        infoDiv.appendChild(img);
+
+        const text = document.createTextNode(`${chat.displayName} : ${chat.lastMessage||""}`);
+        infoDiv.appendChild(text);
+        div.appendChild(infoDiv);
+
+        // フォローボタン
+        const followBtn = document.createElement("button");
+        followBtn.className = "followBtn";
+        followBtn.textContent = chat.followers.includes(currentUser.uid) ? "フォロー中" : "フォロー";
+        followBtn.onclick = (e)=>{
+          e.stopPropagation(); // チャット開くのに干渉させない
+          const userRef = database.ref("users/"+chat.id+"/followers");
+          userRef.once("value").then(snap=>{
+            let arr = snap.val() || [];
+            if(arr.includes(currentUser.uid)){
+              // フォロー解除
+              arr = arr.filter(uid=>uid!==currentUser.uid);
+              followBtn.textContent = "フォロー";
+            } else {
+              // フォロー追加
+              arr.push(currentUser.uid);
+              followBtn.textContent = "フォロー中";
+            }
+            userRef.set(arr);
+            chat.followers = arr;
+          });
+        };
+        div.appendChild(followBtn);
+
         div.onclick = ()=> location.href="dm.html?opponentId="+chat.id;
         chatListDiv.appendChild(div);
       });
@@ -133,7 +162,7 @@
             results.push({
               id: uid,
               displayName: u.displayName,
-              icon: u.icon || "default_icon.png",
+              icon: u.icon || "https://via.placeholder.com/40",
               followers: u.followers || []
             });
           }
