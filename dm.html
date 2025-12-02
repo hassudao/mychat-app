@@ -156,12 +156,16 @@ Object.entries(msgs)
 
     const msgDiv = document.createElement("div");
     msgDiv.className = m.sender===currentUser.uid ? "msg myMsg" : "msg otherMsg";
-    msgDiv.textContent = m.content;
 
-    // ★吹き出し内の時間
+    // 先に本文
+    const textSpan = document.createElement("span");
+    textSpan.textContent = m.content;
+    msgDiv.appendChild(textSpan);
+
+    // ★本文の下に薄い時刻
     const timeSpan = document.createElement("span");
     timeSpan.className = "msgTimeInside";
-    timeSpan.textContent = new Date(m.timestamp).toLocaleTimeString();
+    timeSpan.textContent = new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
     msgDiv.appendChild(timeSpan);
 
     // アイコン
@@ -171,10 +175,13 @@ Object.entries(msgs)
       (currentUser.photoURL || "https://via.placeholder.com/35") :
       (opponentData.photoURL || "https://via.placeholder.com/35");
 
+    // 左右振り分け
     if(m.sender===currentUser.uid){
+      div.classList.add("right");
       div.appendChild(msgDiv);
       div.appendChild(iconImg);
     } else {
+      div.classList.add("left");
       div.appendChild(iconImg);
       div.appendChild(msgDiv);
     }
