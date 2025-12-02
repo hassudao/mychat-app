@@ -1,197 +1,258 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>MyChat - トークリスト</title>
-  <style>
-    body { font-family:sans-serif; padding:20px; transition: background 0.3s, color 0.3s; }
-    body.dark { background:#1e1e1e; color:#f0f0f0; }
-    #chatList { max-width:400px; margin:auto; }
-    .chatItem { border:1px solid #ccc; padding:10px; margin-bottom:5px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; }
-    .chatItem img { width:40px; height:40px; border-radius:50%; margin-right:10px; }
-    .chatInfo { display:flex; align-items:center; flex:1; }
-    #searchBar { width:300px; padding:5px; margin-bottom:10px; }
-    #darkToggle { padding:5px 10px; margin-left:10px; }
-    #notifCount { font-weight:bold; margin-left:10px; color:red; }
-    .followBtn { padding:5px 8px; cursor:pointer; }
-  </style>
+<meta charset="utf-8">
+<title>MyChat - トークリスト</title>
+<style>
+body { font-family:sans-serif; padding:20px; transition: background 0.3s, color 0.3s; }
+body.dark { background:#1e1e1e; color:#f0f0f0; }
 
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+#tabContainer { display:flex; gap:10px; margin-bottom:10px; }
+.tabBtn { padding:5px 10px; cursor:pointer; border:1px solid #ccc; border-radius:5px; background:#eee; }
+.tabBtn.active { background:#6200ea; color:white; }
+
+#chatList, #followList { max-width:400px; margin:auto; }
+.chatItem { border:1px solid #ccc; padding:10px; margin-bottom:5px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; }
+.chatItem img { width:40px; height:40px; border-radius:50%; margin-right:10px; }
+.chatInfo { display:flex; align-items:center; flex:1; }
+#searchBar { width:300px; padding:5px; margin-bottom:10px; }
+#darkToggle { padding:5px 10px; margin-left:10px; }
+#notifCount { font-weight:bold; margin-left:10px; color:red; }
+.followBtn { padding:5px 8px; cursor:pointer; }
+</style>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
-  <h2>チャット一覧</h2>
-  <input type="text" id="searchBar" placeholder="ユーザーを検索...">
-  <button id="darkToggle">ダークモード切替</button>
-  <span id="notifCount"></span>
-  <div id="chatList"></div>
+<h2>MyChat</h2>
 
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
-      authDomain: "chatapp-hassu.firebaseapp.com",
-      databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
-      projectId: "chatapp-hassu",
-      storageBucket: "chatapp-hassu.appspot.com",
-      messagingSenderId: "8489684752",
-      appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
-    };
+<div id="tabContainer">
+  <button class="tabBtn active" id="chatTab">チャット一覧</button>
+  <button class="tabBtn" id="followTab">フォロー中</button>
+</div>
 
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const database = firebase.database();
-    const firestore = firebase.firestore();
+<input type="text" id="searchBar" placeholder="ユーザーを検索...">
+<button id="darkToggle">ダークモード切替</button>
+<span id="notifCount"></span>
 
-    const chatListDiv = document.getElementById("chatList");
-    const searchBar = document.getElementById("searchBar");
-    const darkToggle = document.getElementById("darkToggle");
-    const notifCountSpan = document.getElementById("notifCount");
+<div id="chatList"></div>
+<div id="followList" style="display:none;"></div>
 
-    let currentUser = null;
-    let chatListListener = null;
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
+  authDomain: "chatapp-hassu.firebaseapp.com",
+  databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "chatapp-hassu",
+  storageBucket: "chatapp-hassu.appspot.com",
+  messagingSenderId: "8489684752",
+  appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
+};
 
-    if(localStorage.getItem("darkMode")==="true") document.body.classList.add("dark");
-    darkToggle.onclick = ()=>{
-      document.body.classList.toggle("dark");
-      localStorage.setItem("darkMode", document.body.classList.contains("dark"));
-    };
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const database = firebase.database();
+const firestore = firebase.firestore();
 
-    auth.onAuthStateChanged(user=>{
-      if(!user){ location.href="index.html"; return; }
-      currentUser = user;
-      startChatListListener();
-      loadNotifications();
-    });
+const chatListDiv = document.getElementById("chatList");
+const followListDiv = document.getElementById("followList");
+const searchBar = document.getElementById("searchBar");
+const darkToggle = document.getElementById("darkToggle");
+const notifCountSpan = document.getElementById("notifCount");
+const chatTab = document.getElementById("chatTab");
+const followTab = document.getElementById("followTab");
 
-    function getLastValidMessage(opponentId){
-      const chatId = currentUser.uid < opponentId ? currentUser.uid+"_"+opponentId : opponentId+"_"+currentUser.uid;
-      return database.ref(`messages/${chatId}`).orderByChild("timestamp").once("value").then(snap=>{
-        const msgs = snap.val() || {};
-        const validMsgs = Object.values(msgs).filter(m=>!m.deleted);
-        if(validMsgs.length===0) return "";
-        return validMsgs[validMsgs.length-1].content;
-      });
+let currentUser = null;
+
+if(localStorage.getItem("darkMode")==="true") document.body.classList.add("dark");
+darkToggle.onclick = ()=>{
+  document.body.classList.toggle("dark");
+  localStorage.setItem("darkMode", document.body.classList.contains("dark"));
+};
+
+// タブ切替
+chatTab.onclick = ()=>{
+  chatTab.classList.add("active");
+  followTab.classList.remove("active");
+  chatListDiv.style.display="block";
+  followListDiv.style.display="none";
+};
+followTab.onclick = ()=>{
+  chatTab.classList.remove("active");
+  followTab.classList.add("active");
+  chatListDiv.style.display="none";
+  followListDiv.style.display="block";
+  loadFollowList();
+};
+
+auth.onAuthStateChanged(user=>{
+  if(!user){ location.href="index.html"; return; }
+  currentUser = user;
+  startChatListListener();
+  loadNotifications();
+});
+
+function startChatListListener(){
+  const chatRef = database.ref("chats/"+currentUser.uid+"/list");
+  chatRef.on("value", snapshot=>{
+    const data = snapshot.val() || {};
+    const list = [];
+    const promises = [];
+    for(const opponentId in data){
+      promises.push(
+        database.ref("users/"+opponentId).once("value").then(userSnap=>{
+          const userData = userSnap.val();
+          if(!userData){
+            database.ref("chats/"+currentUser.uid+"/list/"+opponentId).remove();
+            return;
+          }
+          // lastMessageが削除済みなら一つ前のメッセージ取得
+          const chatId = currentUser.uid < opponentId ? currentUser.uid+"_"+opponentId : opponentId+"_"+currentUser.uid;
+          database.ref("messages/"+chatId).orderByChild("timestamp").limitToLast(1).once("value").then(msgSnap=>{
+            const msgs = msgSnap.val() || {};
+            const lastMsg = Object.values(msgs).pop() || {content:""};
+            list.push({
+              id: opponentId,
+              lastMessage: lastMsg.content,
+              displayName: userData.displayName || opponentId,
+              photoURL: userData.photoURL || "https://via.placeholder.com/40",
+              followers: userData.followers || []
+            });
+          });
+        })
+      );
     }
+    Promise.all(promises).then(()=> displayChatList(list));
+  });
+}
 
-    function startChatListListener(){
-      if(chatListListener) chatListListener.off();
+function displayChatList(list){
+  chatListDiv.innerHTML = "";
+  list.forEach(chat=>{
+    const div = document.createElement("div");
+    div.className="chatItem";
 
-      const chatRef = database.ref("chats/"+currentUser.uid+"/list");
-      chatListListener = chatRef;
-      chatRef.on("value", snapshot=>{
-        const data = snapshot.val() || {};
-        const list = [];
-        const promises = [];
+    const infoDiv = document.createElement("div");
+    infoDiv.className="chatInfo";
+    const img = document.createElement("img");
+    img.src = chat.photoURL;
+    infoDiv.appendChild(img);
 
-        for(const opponentId in data){
-          promises.push(
-            database.ref("users/"+opponentId).once("value").then(userSnap=>{
-              const userData = userSnap.val();
-              if(!userData) {
-                database.ref("chats/"+currentUser.uid+"/list/"+opponentId).remove();
-                return;
-              }
-              return getLastValidMessage(opponentId).then(lastMsg=>{
-                if(lastMsg===""){
-                  // 有効メッセージなしならリストから削除
-                  database.ref("chats/"+currentUser.uid+"/list/"+opponentId).remove();
-                  return;
-                }
-                list.push({
-                  id: opponentId,
-                  lastMessage: lastMsg,
-                  displayName: userData.displayName || opponentId,
-                  photoURL: userData.photoURL || "https://via.placeholder.com/40",
-                  followers: userData.followers || []
-                });
-              });
-            })
-          );
+    const text = document.createTextNode(`${chat.displayName} : ${chat.lastMessage||""}`);
+    infoDiv.appendChild(text);
+    div.appendChild(infoDiv);
+
+    const followBtn = document.createElement("button");
+    followBtn.className = "followBtn";
+    followBtn.textContent = chat.followers.includes(currentUser.uid) ? "フォロー中" : "フォロー";
+    followBtn.onclick = (e)=>{
+      e.stopPropagation();
+      const userRef = database.ref("users/"+chat.id+"/followers");
+      userRef.once("value").then(snap=>{
+        let arr = snap.val() || [];
+        if(arr.includes(currentUser.uid)){
+          arr = arr.filter(uid=>uid!==currentUser.uid);
+          followBtn.textContent = "フォロー";
+        } else {
+          arr.push(currentUser.uid);
+          followBtn.textContent = "フォロー中";
         }
-
-        Promise.all(promises).then(()=> displayChatList(list));
+        userRef.set(arr);
+        chat.followers = arr;
       });
-    }
+    };
+    div.appendChild(followBtn);
 
-    function displayChatList(list){
-      chatListDiv.innerHTML = "";
-      list.forEach(chat=>{
+    div.onclick = ()=> location.href="dm.html?opponentId="+chat.id;
+    chatListDiv.appendChild(div);
+  });
+}
+
+// フォロー中リスト
+function loadFollowList(){
+  database.ref("users/"+currentUser.uid+"/following").once("value").then(snap=>{
+    const following = snap.val() || [];
+    followListDiv.innerHTML = "";
+    following.forEach(uid=>{
+      database.ref("users/"+uid).once("value").then(uSnap=>{
+        const u = uSnap.val();
+        if(!u) return;
         const div = document.createElement("div");
         div.className="chatItem";
 
         const infoDiv = document.createElement("div");
         infoDiv.className="chatInfo";
         const img = document.createElement("img");
-        img.src = chat.photoURL;
+        img.src = u.photoURL || "https://via.placeholder.com/40";
         infoDiv.appendChild(img);
-
-        const text = document.createTextNode(`${chat.displayName} : ${chat.lastMessage||""}`);
+        const text = document.createTextNode(u.displayName || uid);
         infoDiv.appendChild(text);
         div.appendChild(infoDiv);
 
-        const followBtn = document.createElement("button");
-        followBtn.className = "followBtn";
-        followBtn.textContent = chat.followers.includes(currentUser.uid) ? "フォロー中" : "フォロー";
-        followBtn.onclick = (e)=>{
+        const unfollowBtn = document.createElement("button");
+        unfollowBtn.textContent = "フォロー中";
+        unfollowBtn.onclick = (e)=>{
           e.stopPropagation();
-          const userRef = database.ref("users/"+chat.id+"/followers");
-          userRef.once("value").then(snap=>{
+          // フォロー解除
+          database.ref("users/"+uid+"/followers").once("value").then(snap=>{
             let arr = snap.val() || [];
-            if(arr.includes(currentUser.uid)){
-              arr = arr.filter(uid=>uid!==currentUser.uid);
-              followBtn.textContent = "フォロー";
-              // フォロー解除ならリストから削除
-              startChatListListener();
-            } else {
-              arr.push(currentUser.uid);
-              followBtn.textContent = "フォロー中";
-            }
-            userRef.set(arr);
-            chat.followers = arr;
+            arr = arr.filter(x=>x!==currentUser.uid);
+            database.ref("users/"+uid+"/followers").set(arr);
           });
+          database.ref("users/"+currentUser.uid+"/following").once("value").then(snap=>{
+            let arr = snap.val() || [];
+            arr = arr.filter(x=>x!==uid);
+            database.ref("users/"+currentUser.uid+"/following").set(arr);
+          });
+          div.remove();
         };
-        div.appendChild(followBtn);
+        div.appendChild(unfollowBtn);
 
-        div.onclick = ()=> location.href="dm.html?opponentId="+chat.id;
-        chatListDiv.appendChild(div);
-      });
-    }
-
-    searchBar.addEventListener("input", ()=>{
-      const kw = searchBar.value.trim().toLowerCase();
-      if(!kw){ startChatListListener(); return; }
-
-      database.ref("users").once("value").then(snapshot=>{
-        const users = snapshot.val() || {};
-        const results = [];
-        for(const uid in users){
-          const u = users[uid];
-          if(!u) continue;
-          const name = (u.displayName||"").toLowerCase();
-          const email = (u.email||"").toLowerCase();
-          if(uid.toLowerCase().includes(kw) || name.includes(kw) || email.includes(kw)){
-            results.push({
-              id: uid,
-              displayName: u.displayName,
-              photoURL: u.photoURL || "https://via.placeholder.com/40",
-              followers: u.followers || []
-            });
-          }
-        }
-        displayChatList(results);
+        div.onclick = ()=> location.href="dm.html?opponentId="+uid;
+        followListDiv.appendChild(div);
       });
     });
+  });
+}
 
-    function loadNotifications(){
-      firestore.collection("notifications").doc(currentUser.uid).collection("list")
-      .onSnapshot(snapshot=>{
-        const notifs = snapshot.docs.map(d=>d.data());
-        const unreadCount = notifs.filter(n=>!n.read).length;
-        notifCountSpan.textContent = unreadCount>0 ? `新着: ${unreadCount}` : "";
-      });
+// 検索
+searchBar.addEventListener("input", ()=>{
+  const kw = searchBar.value.trim().toLowerCase();
+  if(!kw){ startChatListListener(); return; }
+
+  database.ref("users").once("value").then(snapshot=>{
+    const users = snapshot.val() || {};
+    const results = [];
+    for(const uid in users){
+      const u = users[uid];
+      if(!u) continue;
+      const name = (u.displayName||"").toLowerCase();
+      const email = (u.email||"").toLowerCase();
+      if(uid.toLowerCase().includes(kw) || name.includes(kw) || email.includes(kw)){
+        results.push({
+          id: uid,
+          displayName: u.displayName,
+          photoURL: u.photoURL || "https://via.placeholder.com/40",
+          followers: u.followers || []
+        });
+      }
     }
-  </script>
+    displayChatList(results);
+  });
+});
+
+// 通知
+function loadNotifications(){
+  firestore.collection("notifications").doc(currentUser.uid).collection("list")
+  .onSnapshot(snapshot=>{
+    const notifs = snapshot.docs.map(d=>d.data());
+    const unreadCount = notifs.filter(n=>!n.read).length;
+    notifCountSpan.textContent = unreadCount>0 ? `新着: ${unreadCount}` : "";
+  });
+}
+</script>
 </body>
 </html>
