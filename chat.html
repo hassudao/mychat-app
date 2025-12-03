@@ -206,12 +206,17 @@ darkToggle.onclick = ()=>{
    ログイン状態
 ------------------- */
 auth.onAuthStateChanged(user=>{
-  if(!user){ location.href="index.html"; return; }
-  currentUser=user;
+  if(!user){
+    location.href="index.html";
+    return;
+  }
 
+  currentUser = user;
+
+  // 🔥ログイン後に読み込む
   loadChats();
   loadFollows();
-  loadNotifications();
+  loadNotifications(); // ← 必ずここ！
 });
 
 /* -------------------
