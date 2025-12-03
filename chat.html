@@ -474,6 +474,33 @@ function displayFollows(){
 /* -------------------
    検索機能
 ------------------- */
+  if(mode==="search"){
+  const btn = document.createElement("button");
+  btn.className="followBtn";
+  
+  // 初期表示を「フォロー」か「フォロー中」に切り替え
+  database.ref("users/"+currentUser.uid+"/following").once("value").then(s=>{
+    const arr = s.val()||[];
+    btn.textContent = arr.includes(user.id) ? "フォロー中" : "フォロー";
+  });
+
+  btn.onclick = (e)=>{
+    e.stopPropagation();
+    database.ref("users/"+currentUser.uid+"/following").once("value").then(s=>{
+      let arr = s.val()||[];
+      if(arr.includes(user.id)){
+        arr = arr.filter(uid=>uid!==user.id);
+        btn.textContent = "フォロー";
+      }else{
+        arr.push(user.id);
+        btn.textContent = "フォロー中";
+        pushFollowNotification(user.id); // フォロー通知
+      }
+      database.ref("users/"+currentUser.uid+"/following").set(arr);
+    });
+  };
+  div.appendChild(btn);
+  }
 searchBar.addEventListener("input", ()=>{
   const kw = searchBar.value.trim().toLowerCase();
 
