@@ -3,51 +3,72 @@
 <head>
 <meta charset="utf-8">
 <title>MyChat - トークリスト</title>
+
 <style>
 body {
-  font-family:sans-serif; padding:20px;
+  font-family:sans-serif;
+  padding:20px;
   transition: background 0.3s, color 0.3s;
 }
 body.dark { background:#1e1e1e; color:#f0f0f0; }
 
-#tabs { display:flex; gap:10px; margin-bottom:10px; }
-.tabBtn { padding:5px 10px; cursor:pointer; border:none; border-radius:5px; background:#ccc; }
-.tabBtn.active { background:#6200ea; color:white; }
-
 .listContainer { max-width:400px; margin:auto; }
 .listContainer div {
-  border:1px solid #ccc; padding:10px; margin-bottom:5px;
-  cursor:pointer; display:flex; align-items:center; justify-content:space-between;
+  border:1px solid #ccc;
+  padding:10px; margin-bottom:5px;
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:space-between;
+  background:white;
 }
-.listContainer img { width:40px; height:40px; border-radius:50%; margin-right:10px; }
+body.dark .listContainer div { background:#2b2b2b; border-color:#555; }
+
+.listContainer img {
+  width:40px; height:40px; border-radius:50%;
+  margin-right:10px;
+}
 .listInfo { display:flex; align-items:center; flex:1; }
 
-.followBtn { padding:5px 8px; cursor:pointer; }
+.followBtn {
+  padding:5px 8px; cursor:pointer;
+}
 
-#searchBar { width:300px; padding:5px; margin-bottom:10px; }
-#darkToggle { padding:5px 10px; margin-left:10px; }
+#searchBar {
+  width:300px;
+  padding:5px;
+  margin-bottom:10px;
+}
+
+#darkToggle {
+  padding:5px 10px;
+  margin-bottom:15px;
+  cursor:pointer;
+}
 </style>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 </head>
+
 <body>
+
 <h2>MyChat</h2>
 
-<div id="tabs">
-  <button class="tabBtn active" id="tabChats">チャット一覧</button>
-  <button class="tabBtn" id="tabFollows">フォロー中一覧</button>
-  <button id="darkToggle">ダークモード切替</button>
-</div>
+<button id="darkToggle">ダークモード切替</button>
 
 <input type="text" id="searchBar" placeholder="ユーザーを検索...">
 
+<!-- 検索結果（フォローボタン付き） -->
 <div id="searchResults" class="listContainer" style="display:none;"></div>
+
+<h3>チャット一覧</h3>
 <div id="chatList" class="listContainer"></div>
-<div id="followList" class="listContainer" style="display:none;"></div>
+
+<h3>フォロー中一覧</h3>
+<div id="followList" class="listContainer"></div>
 
 <script>
+/* Firebase */
 const firebaseConfig = {
   apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
   authDomain: "chatapp-hassu.firebaseapp.com",
@@ -62,62 +83,43 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const database = firebase.database();
 
+/* DOM */
 const searchBar = document.getElementById("searchBar");
-const tabChats = document.getElementById("tabChats");
-const tabFollows = document.getElementById("tabFollows");
-const darkToggle = document.getElementById("darkToggle");
-
 const searchResultsDiv = document.getElementById("searchResults");
 const chatListDiv = document.getElementById("chatList");
 const followListDiv = document.getElementById("followList");
+const darkToggle = document.getElementById("darkToggle");
 
+/*状態*/
 let currentUser=null;
 let chatData=[];
 let followData=[];
-let activeTab="chats";
 
-/* -------------------- ダークモード --------------------- */
-if(localStorage.getItem("darkMode")==="true") {
+/* ダークモード */
+if(localStorage.getItem("darkMode")==="true"){
   document.body.classList.add("dark");
 }
 darkToggle.onclick = ()=>{
   document.body.classList.toggle("dark");
-  localStorage.setItem("darkMode",
-    document.body.classList.contains("dark"));
+  localStorage.setItem("darkMode", document.body.classList.contains("dark"));
 };
 
-/* -------------------- タブ切替 --------------------- */
-tabChats.onclick = ()=>{
-  activeTab='chats';
-  tabChats.classList.add("active");
-  tabFollows.classList.remove("active");
-  searchResultsDiv.style.display='none';
-  followListDiv.style.display='none';
-  chatListDiv.style.display='block';
-};
-
-tabFollows.onclick = ()=>{
-  activeTab='follows';
-  tabFollows.classList.add("active");
-  tabChats.classList.remove("active");
-  searchResultsDiv.style.display='none';
-  chatListDiv.style.display='none';
-  followListDiv.style.display='block';
-};
-
+/* ログイン状態 */
 auth.onAuthStateChanged(user=>{
   if(!user){ location.href="index.html"; return; }
   currentUser=user;
+
   loadChats();
   loadFollows();
 });
 
-/* -------------------- チャット一覧 --------------------- */
+/* チャット一覧ロード */
 function loadChats(){
   database.ref("chats/"+currentUser.uid+"/list").on("value", snap=>{
-    const data = snap.val() || {};
-    chatData = [];
+    const data=snap.val()||{};
+    chatData=[];
     const promises=[];
+
     for(const uid in data){
       promises.push(
         database.ref("users/"+uid).once("value").then(uSnap=>{
@@ -128,23 +130,22 @@ function loadChats(){
           }
           chatData.push({
             id: uid,
-            lastMessage: data[uid].lastMessage || "",
-            displayName: u.displayName || uid,
-            photoURL: u.photoURL || "https://via.placeholder.com/40"
+            displayName: u.displayName,
+            photoURL: u.photoURL || "https://via.placeholder.com/40",
+            lastMessage: data[uid].lastMessage || ""
           });
         })
       );
     }
-    Promise.all(promises).then(()=>{
-      if(activeTab==='chats') displayChats();
-    });
+
+    Promise.all(promises).then(()=> displayChats());
   });
 }
 
-/* -------------------- フォロー一覧 --------------------- */
+/* フォロー中一覧ロード */
 function loadFollows(){
   database.ref("users/"+currentUser.uid+"/following").on("value", snap=>{
-    const arr = snap.val() || [];
+    const arr=snap.val() || [];
     followData=[];
     const promises=[];
 
@@ -162,13 +163,11 @@ function loadFollows(){
       );
     });
 
-    Promise.all(promises).then(()=>{
-      if(activeTab==='follows') displayFollows();
-    });
+    Promise.all(promises).then(()=> displayFollows());
   });
 }
 
-/* -------------------- ユーザーDIV生成（統合版） --------------------- */
+/* UI生成 */
 function createUserDiv(user, mode){
   const div=document.createElement("div");
 
@@ -178,58 +177,58 @@ function createUserDiv(user, mode){
   const img=document.createElement("img");
   img.src=user.photoURL;
   info.appendChild(img);
-  info.appendChild(document.createTextNode(user.displayName + (user.lastMessage? "： "+user.lastMessage : "")));
+
+  info.appendChild(
+    document.createTextNode(user.displayName + (user.lastMessage ? "： " + user.lastMessage : ""))
+  );
   div.appendChild(info);
 
-  /* フォローボタン（検索 & フォロー一覧の共通処理） */
-  if(mode==="search" || mode==="follow"){
+  /* フォローボタン付き（検索結果） */
+  if(mode==="search"){
     const btn=document.createElement("button");
     btn.className="followBtn";
+    btn.textContent="フォロー";
 
-    // 初期表示
-    database.ref("users/"+currentUser.uid+"/following").once("value").then(s=>{
-      let arr=s.val()||[];
-      btn.textContent = arr.includes(user.id) ? "フォロー中" : "フォロー";
-    });
+    btn.onclick=(e)=>{
+      e.stopPropagation();
+      database.ref("users/"+currentUser.uid+"/following").once("value").then(s=>{
+        let arr=s.val() || [];
+        if(!arr.includes(user.id)) arr.push(user.id);
+        database.ref("users/"+currentUser.uid+"/following").set(arr);
+      });
+    };
+    div.appendChild(btn);
+  }
+
+  /* フォロー中解除ボタン */
+  if(mode==="follow"){
+    const btn=document.createElement("button");
+    btn.className="followBtn";
+    btn.textContent="解除";
 
     btn.onclick=(e)=>{
       e.stopPropagation();
       database.ref("users/"+currentUser.uid+"/following").once("value").then(s=>{
         let arr=s.val()||[];
-
-        if(arr.includes(user.id)){
-          arr = arr.filter(id=>id !== user.id);
-          btn.textContent="フォロー";
-        }else{
-          arr.push(user.id);
-          btn.textContent="フォロー中";
-        }
-
+        arr = arr.filter(id => id!==user.id);
         database.ref("users/"+currentUser.uid+"/following").set(arr);
       });
     };
-
     div.appendChild(btn);
   }
 
-  /* DMへ遷移（相互フォロー必須） */
+  /* DMへ遷移（相互フォローのみ許可） */
   div.onclick = ()=>{
-    if(mode==="chat"){
-      location.href = "dm.html?opponentId="+user.id;
-      return;
-    }
+    if(mode==="search") return; // 検索結果クリックは DMに飛ばない
 
-    Promise.all([
-      database.ref("users/"+currentUser.uid+"/following").once("value"),
-      database.ref("users/"+user.id+"/following").once("value")
-    ]).then(([mine, theirs])=>{
-      const meF = mine.val()||[];
-      const theyF = theirs.val()||[];
+    /* 相手が自分をフォローしてるか確認 */
+    database.ref("users/"+user.id+"/following").once("value").then(s=>{
+      const theirFollow = s.val() || [];
 
-      if(meF.includes(user.id) && theyF.includes(currentUser.uid)){
+      if(theirFollow.includes(currentUser.uid)){
         location.href = "dm.html?opponentId="+user.id;
-      } else {
-        alert("相互フォローの相手だけDMできるでよ！😤🔥");
+      }else{
+        alert("相互フォローの相手のみDMできます！");
       }
     });
   };
@@ -237,7 +236,7 @@ function createUserDiv(user, mode){
   return div;
 }
 
-/* -------------------- 表示処理 --------------------- */
+/*描画*/
 function displayChats(){
   chatListDiv.innerHTML="";
   chatData.forEach(u=>{
@@ -252,9 +251,10 @@ function displayFollows(){
   });
 }
 
-/* -------------------- 検索機能 --------------------- */
+/* 検索機能 */
 searchBar.addEventListener("input", ()=>{
-  const kw=searchBar.value.trim().toLowerCase();
+  const kw = searchBar.value.trim().toLowerCase();
+
   if(!kw){
     searchResultsDiv.style.display='none';
     return;
@@ -264,23 +264,27 @@ searchBar.addEventListener("input", ()=>{
   searchResultsDiv.innerHTML="";
 
   database.ref("users").once("value").then(snap=>{
-    const users = snap.val() || {};
+    const users=snap.val() || {};
+
     for(const uid in users){
       if(uid===currentUser.uid) continue;
 
       const u=users[uid];
       const name=(u.displayName||"").toLowerCase();
-      if(name.includes(kw)||uid.includes(kw)){
+
+      if(name.includes(kw) || uid.includes(kw)){
         searchResultsDiv.appendChild(
-          createUserDiv(
-            {id:uid, displayName:u.displayName, photoURL:u.photoURL||"https://via.placeholder.com/40"},
-            "search"
-          )
+          createUserDiv({
+            id: uid,
+            displayName: u.displayName,
+            photoURL: u.photoURL || "https://via.placeholder.com/40"
+          },"search")
         );
       }
     }
   });
 });
 </script>
+
 </body>
 </html>
