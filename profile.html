@@ -1,222 +1,193 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>プロフィール設定</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            margin: 0;
-            background: #f0f0f0;
-        }
+<meta charset="UTF-8" />
+<title>プロフィール設定</title>
 
-        .container {
-            max-width: 430px;
-            margin: 30px auto;
-            background: #fff;
-            padding: 20px;
-            border-radius: 15px;
-            box-shadow: 0 0 10px #ccc;
-        }
+<style>
+body {
+    font-family: sans-serif;
+    background: #f0f0f0;
+}
+.container {
+    max-width: 430px;
+    margin: 30px auto;
+    background: #fff;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 0 10px #ccc;
+}
+h2 {
+    text-align: center;
+    margin-bottom: 5px;
+}
+.current-profile {
+    text-align: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #ddd;
+}
+.current-profile img {
+    width: 90px;
+    height: 90px;
+    border-radius: 90px;
+    object-fit: cover;
+    border: 2px solid #aaa;
+}
+.current-name {
+    margin-top: 10px;
+    font-size: 18px;
+    font-weight: bold;
+}
+label {
+    font-weight: bold;
+    margin-top: 10px;
+    display: block;
+}
+input, textarea {
+    width: 100%;
+    padding: 10px;
+    margin-top: 4px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+}
+.btn {
+    width: 100%;
+    margin-top: 20px;
+    padding: 12px;
+    border: none;
+    border-radius: 10px;
+    background: #4e8cff;
+    color: #fff;
+    font-size: 15px;
+    cursor: pointer;
+}
+.btn:hover { opacity: 0.9; }
+.icon-preview {
+    text-align: center;
+    margin-top: 15px;
+}
+.icon-preview img {
+    width: 100px;
+    height:100px;
+    border-radius: 100px;
+    border: 2px solid #aaa;
+    object-fit: cover;
+}
+</style>
 
-        h2 {
-            text-align: center;
-            margin-bottom: 5px;
-        }
+<!-- Firebase Compat -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
-        /* 現在のプロフィール表示ゾーン */
-        .current-profile {
-            text-align: center;
-            margin-bottom: 20px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #ddd;
-        }
-        .current-profile img {
-            width: 90px;
-            height: 90px;
-            border-radius: 90px;
-            object-fit: cover;
-            border: 2px solid #aaa;
-        }
-        .current-name {
-            margin-top: 10px;
-            font-size: 18px;
-            font-weight: bold;
-        }
-
-        label {
-            font-weight: bold;
-            margin-top: 10px;
-            display: block;
-        }
-
-        input, textarea {
-            width: 100%;
-            padding: 10px;
-            margin-top: 4px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-        }
-
-        .btn {
-            width: 100%;
-            margin-top: 20px;
-            padding: 12px;
-            border: none;
-            border-radius: 10px;
-            background: #4e8cff;
-            color: #fff;
-            font-size: 15px;
-            cursor: pointer;
-        }
-
-        .btn:hover {
-            opacity: 0.85;
-        }
-
-        .icon-preview {
-            text-align: center;
-            margin-top: 15px;
-        }
-
-        .icon-preview img {
-            width: 100px;
-            height: 100px;
-            border-radius: 100px;
-            object-fit: cover;
-            border: 2px solid #aaa;
-        }
-
-        .back-btn {
-            margin-top: 15px;
-            text-align: center;
-        }
-        .back-btn a {
-            color: #4e8cff;
-            text-decoration: none;
-        }
-    </style>
 </head>
-
 <body>
-    <div class="container">
-        <h2>プロフィール設定</h2>
 
-        <!-- 現在のプロフィール表示 -->
-        <div class="current-profile">
-            <img id="currentIcon" src="" alt="icon">
-            <div class="current-name" id="currentName">読み込み中…</div>
-        </div>
+<div class="container">
+    <h2>プロフィール設定</h2>
 
-        <!-- 新しい設定 -->
-        <label>表示名</label>
-        <input id="displayNameInput" type="text" />
-
-        <label>アイコンURL</label>
-        <input id="photoURLInput" type="text" />
-
-        <label>自己紹介</label>
-        <textarea id="bioInput" rows="3"></textarea>
-
-        <div class="icon-preview">
-            <img id="iconPreview" src="" alt="icon">
-        </div>
-
-        <button class="btn" id="saveBtn">保存する</button>
-
-        <div class="back-btn">
-            <a href="chat.html">← チャットに戻る</a>
-        </div>
+    <!-- 現在のプロフィール表示 -->
+    <div class="current-profile">
+        <img id="currentIcon" src="">
+        <div class="current-name" id="currentName">読み込み中…</div>
     </div>
 
+    <label>表示名</label>
+    <input id="displayNameInput" type="text">
 
-    <!-- Firebase -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    <label>アイコンURL</label>
+    <input id="photoURLInput" type="text">
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
+    <label>自己紹介</label>
+    <textarea id="bioInput" rows="3"></textarea>
+
+    <div class="icon-preview">
+        <img id="iconPreview" src="">
+    </div>
+
+    <button class="btn" id="saveBtn">保存する</button>
+</div>
+
+<script>
+/* Firebase */
+const firebaseConfig = {
+  apiKey: "AIzaSyCEMXXNqQ3U7ojoY9h94X2yeFCJgXNtTwA",
   authDomain: "chatapp-hassu.firebaseapp.com",
   databaseURL: "https://chatapp-hassu-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "chatapp-hassu",
   storageBucket: "chatapp-hassu.appspot.com",
   messagingSenderId: "8489684752",
   appId: "1:8489684752:web:8e3fee02ce385cbda11f95"
-        };
+};
+firebase.initializeApp(firebaseConfig);
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+const auth = firebase.auth();
+const db = firebase.database();
 
-        const currentName = document.getElementById("currentName");
-        const currentIcon = document.getElementById("currentIcon");
+/* DOM */
+const currentName = document.getElementById("currentName");
+const currentIcon = document.getElementById("currentIcon");
+const displayNameInput = document.getElementById("displayNameInput");
+const photoURLInput = document.getElementById("photoURLInput");
+const bioInput = document.getElementById("bioInput");
+const iconPreview = document.getElementById("iconPreview");
+const saveBtn = document.getElementById("saveBtn");
 
-        const displayNameInput = document.getElementById("displayNameInput");
-        const photoURLInput = document.getElementById("photoURLInput");
-        const bioInput = document.getElementById("bioInput");
-        const iconPreview = document.getElementById("iconPreview");
-        const saveBtn = document.getElementById("saveBtn");
+auth.onAuthStateChanged(async user=>{
+    if(!user){
+        alert("ログインしてちょ〜");
+        location.href="index.html";
+        return;
+    }
 
-        onAuthStateChanged(auth, async (user) => {
-            if (!user) {
-                alert("ログインしてちょ〜");
-                location.href = "login.html";
-                return;
-            }
+    const ref = db.ref("users/" + user.uid);
+    ref.once("value").then(snap=>{
+        const data = snap.val() || {};
 
-            const ref = doc(db, "users", user.uid);
-            const snap = await getDoc(ref);
+        /* 現在プロフィール */
+        currentName.textContent = data.displayName || "名前未設定";
+        currentIcon.src = data.photoURL || "https://via.placeholder.com/100";
 
-            if (snap.exists()) {
-                const data = snap.data();
+        /* 入力欄にも反映 */
+        displayNameInput.value = data.displayName || "";
+        photoURLInput.value = data.photoURL || "";
+        bioInput.value = data.bio || "";
+        iconPreview.src = data.photoURL || "";
+    });
+});
 
-                // 現在のプロフィール表示
-                currentName.textContent = data.displayName ?? "名前なし";
-                currentIcon.src = data.photoURL ?? "";
+/* アイコンプレビュー */
+photoURLInput.addEventListener("input", ()=>{
+    iconPreview.src = photoURLInput.value;
+});
 
-                // 編集欄に反映
-                displayNameInput.value = data.displayName ?? "";
-                photoURLInput.value = data.photoURL ?? "";
-                bioInput.value = data.bio ?? "";
-                iconPreview.src = data.photoURL ?? "";
-            }
-        });
+/* 保存 */
+saveBtn.onclick = async ()=>{
+    const user = auth.currentUser;
+    if(!user) return;
 
-        photoURLInput.addEventListener("input", () => {
-            iconPreview.src = photoURLInput.value;
-        });
+    const newData = {
+        displayName: displayNameInput.value.trim(),
+        photoURL: photoURLInput.value.trim(),
+        bio: bioInput.value.trim()
+    };
 
-        saveBtn.addEventListener("click", async () => {
-            const user = auth.currentUser;
-            if (!user) return;
+    /* Auth 側にも反映（名前 + 画像） */
+    await user.updateProfile({
+        displayName: newData.displayName,
+        photoURL: newData.photoURL
+    });
 
-            const newName = displayNameInput.value.trim();
-            const newIcon = photoURLInput.value.trim();
-            const newBio = bioInput.value.trim();
+    /* Realtime DB に保存 */
+    db.ref("users/" + user.uid).update(newData);
 
-            // Auth 側更新
-            await updateProfile(user, {
-                displayName: newName,
-                photoURL: newIcon
-            });
+    alert("保存したがね〜‼️");
 
-            // Firestore 更新
-            const ref = doc(db, "users", user.uid);
-            await updateDoc(ref, {
-                displayName: newName,
-                photoURL: newIcon,
-                bio: newBio
-            });
-
-            alert("変更保存したでよ〜‼️✨");
-
-            // ⭐ 保存後 chat.html に戻る
-            location.href = "chat.html";
-        });
-    </script>
+    /* 保存後チャットに戻る */
+    location.href = "chat.html";
+};
+</script>
 
 </body>
-</html>
+    </html>
