@@ -188,30 +188,42 @@ profileIconInput.onchange = ()=>{
   }
 };
 
-/* ▼プロフィール保存（完全修正版） */
+/* ▼プロフィール保存（デバッグ版） */
 saveProfileBtn.onclick = async () => {
+  console.log("=== 保存開始 ===");
+
   try {
     const name = profileNameInput.value.trim();
     const userRef = database.ref("users/" + currentUser.uid);
 
     // ▼ 現在のユーザーデータ取得
-    const oldData = (await userRef.once("value")).val() || {};
+    const oldDataSnap = await userRef.once("value");
+    const oldData = oldDataSnap.val() || {};
     let iconURL = oldData.photoURL || currentUser.photoURL || "";
 
-    // ▼ アイコンが選ばれた場合のみアップロード
+    // ▼ ファイル取得
     const file = profileIconInput.files[0];
-    if (file) {
-      // 拡張子取得
-      const ext = file.name.split('.').pop();
+    console.log("選択されたファイル:", file);
 
-      // Storage パス
+    if (file) {
+      const ext = file.name.split('.').pop();
       const iconRef = storage.ref(`icons/${currentUser.uid}.${ext}`);
 
-      // アップロード完了まで待つ
-      await iconRef.put(file);
+      console.log("アップロード開始:", iconRef.fullPath);
 
-      // URLを取得
-      iconURL = await iconRef.getDownloadURL();
+      try {
+        const uploadTask = await iconRef.put(file);
+        console.log("アップロード成功:", uploadTask);
+
+        iconURL = await iconRef.getDownloadURL();
+        console.log("ダウンロードURL:", iconURL);
+      } catch (uploadErr) {
+        console.error("アップロードエラー:", uploadErr);
+        alert("アイコン画像のアップロードで失敗したがね…😭");
+        return;
+      }
+    } else {
+      console.log("ファイル変更なし → 既存アイコンURL使用");
     }
 
     // ▼ RealtimeDB 保存
@@ -219,29 +231,30 @@ saveProfileBtn.onclick = async () => {
       displayName: name,
       photoURL: iconURL
     });
+    console.log("RealtimeDB 更新 OK");
 
-    // ▼ Auth 情報更新（これ失敗しやすいので try-catch 付き）
+    // ▼ Auth 更新
     try {
       await currentUser.updateProfile({
         displayName: name,
         photoURL: iconURL
       });
-    } catch (err) {
-      console.warn("Auth 更新エラー:", err);
-      // Auth は無視して OK（DB 側が正しければアプリは動く）
+      console.log("Auth プロフィール更新 OK");
+    } catch (authErr) {
+      console.warn("Auth 更新エラー:", authErr);
     }
 
-    alert("保存したがねぇ〜‼️🔥🔥✨");
+    alert("保存したがね〜‼️🔥");
     profileModal.style.display = "none";
 
-    // 再読み込み
     loadProfileInfo();
 
   } catch (err) {
-    console.error("プロフィール保存エラー:", err);
-    alert("エラー出てまったがね…💦");
+    console.error("致命的エラー:", err);
+    alert("予期せんエラーが発生したがね…😭");
   }
 };
+  
 /* === 通知センター（最新プロフィール反映版） === */
 notifyBtn.onclick = ()=>{
   notifyPopup.style.display =
