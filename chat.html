@@ -95,7 +95,7 @@ body.dark #profileBox { background:#2b2b2b; color:white; }
 <h2>MyChat</h2>
 <button id="darkToggle">ダークモード切替</button>
 
-<!-- ▼追加 プロフィール編集ボタン -->
+<!-- ▼プロフィール編集ボタン -->
 <button id="openProfile">プロフィール編集</button>
 
 <input type="text" id="searchBar" placeholder="ユーザーを検索...">
@@ -110,7 +110,7 @@ body.dark #profileBox { background:#2b2b2b; color:white; }
 <h3>フォロー中一覧</h3>
 <div id="followList" class="listContainer"></div>
 
-<!-- ▼追加：プロフィール編集モーダル -->
+<!-- ▼プロフィール編集モーダル -->
 <div id="profileModal">
   <div id="profileBox">
     <h3>プロフィール編集</h3>
@@ -122,7 +122,6 @@ body.dark #profileBox { background:#2b2b2b; color:white; }
     <button id="closeProfile">閉じる</button>
   </div>
 </div>
-
 
 <script>
 /* ===== Firebase ===== */
@@ -160,9 +159,7 @@ auth.onAuthStateChanged(user=>{
   if(!user){ location.href="index.html"; return; }
   currentUser=user;
 
-  // ▼ここで現在のプロフィール情報を反映
   loadProfileInfo();
-
   loadChats();
   loadFollows();
   loadNotifications();
@@ -177,11 +174,11 @@ function loadProfileInfo(){
   });
 }
 
-/* ▼プロフィール編集モーダル操作 */
+/* ▼モーダル操作 */
 openProfileBtn.onclick = ()=> profileModal.style.display="flex";
 closeProfileBtn.onclick = ()=> profileModal.style.display="none";
 
-/* ▼アイコン変更プレビュー */
+/* ▼プレビュー */
 profileIconInput.onchange = ()=>{
   const file = profileIconInput.files[0];
   if(file){
@@ -191,79 +188,50 @@ profileIconInput.onchange = ()=>{
   }
 };
 
-/* ▼プロフィール保存（完全修正版） */
+/* ▼プロフィール保存 */
 saveProfileBtn.onclick = async ()=>{
   const name = profileNameInput.value.trim();
   let iconURL = null;
 
-  // 現在のユーザー情報取得
   const userRef = database.ref("users/"+currentUser.uid);
-  const userSnap = await userRef.once("value");
-  const userData = userSnap.val() || {};
 
-  // ▼アイコンを選択した場合のみアップロード
+  // 既存データを取得
+  const oldData = (await userRef.once("value")).val() || {};
+
+  // アイコン変更した？
   if(profileIconInput.files[0]){
-    const file = profileIconInput.files[0];
-    const storageRef = storage.ref("icons/" + currentUser.uid + ".jpg");
-
-    // アップロード
-    await storageRef.put(file);
-
-    // URL取得
-    iconURL = await storageRef.getDownloadURL();
+    const ref = storage.ref("icons/"+currentUser.uid+".jpg");
+    await ref.put(profileIconInput.files[0]);
+    iconURL = await ref.getDownloadURL();
   } else {
-    // 画像未変更なら既存画像使う（なければプレースホルダー）
-    iconURL = userData.photoURL || currentUser.photoURL || "https://via.placeholder.com/70";
+    // 変更無し → 既存のURLそのまま
+    iconURL = oldData.photoURL || currentUser.photoURL || "";
   }
 
-  // ▼Realtime Database 更新
+  // DB 更新
   await userRef.update({
     displayName: name,
     photoURL: iconURL
   });
 
-  // ▼Auth情報も同期
-  await currentUser.updateProfile({
-    displayName: name,
-    photoURL: iconURL
-  });
-
-  alert("保存したったがね‼️✨");
-  profileModal.style.display = "none";
-
-  loadProfileInfo(); // 即反映
-};
-
-  /* アイコンアップロード */
-  if(profileIconInput.files[0]){
-    const ref = storage.ref("icons/"+currentUser.uid+".jpg");
-    await ref.put(profileIconInput.files[0]);
-    iconURL = await ref.getDownloadURL();
-  }
-
-  /* データベース更新 */
-  await database.ref("users/"+currentUser.uid).update({
-    displayName: name,
-    photoURL: iconURL
-  });
-
-  /* Firebase Auth の表示名も更新 */
+  // Auth 更新
   await currentUser.updateProfile({ displayName:name, photoURL:iconURL });
 
-  alert("保存したがねッ‼️");
+  alert("保存したがねッ‼️🔥");
   profileModal.style.display="none";
 
-  loadProfileInfo(); // 即反映
+  loadProfileInfo();
 };
 
-/* ====== 以下、既存のチャット・フォロー・通知処理（省略なし） ====== */
-/*（あなたの元コードは全部ここに残してある‼️）*/
-
-/* 通知センター */
-notifyBtn.onclick = ()=>{ notifyPopup.style.display = (notifyPopup.style.display==="none"||notifyPopup.style.display==="")?"block":"none"; };
+/* === 通知センター === */
+notifyBtn.onclick = ()=>{
+  notifyPopup.style.display =
+    (notifyPopup.style.display==="none"||notifyPopup.style.display==="") ? "block" : "none";
+};
 
 function loadNotifications(){
-  database.ref("notifications/"+currentUser.uid+"/list").limitToLast(10)
+  database.ref("notifications/"+currentUser.uid+"/list")
+  .limitToLast(10)
   .on("value", snap=>{
     const data=snap.val()||{};
     const arr = Object.values(data).sort((a,b)=>b.time-a.time);
@@ -273,17 +241,23 @@ function loadNotifications(){
 
 function displayNotifications(list){
   notifyPopup.innerHTML="";
-  if(list.length===0){ notifyPopup.innerHTML="<div>通知はないがね〜</div>"; return; }
+  if(list.length===0){
+    notifyPopup.innerHTML="<div>通知はないがね〜</div>";
+    return;
+  }
 
   list.forEach(n=>{
     const div=document.createElement("div");
     div.className="notifyItem";
-    div.innerHTML=`<div>${n.message}</div><button class="fbBtn" data-id="${n.from}">フォローバック</button>`;
+    div.innerHTML=`
+      <div>${n.message}</div>
+      <button class="fbBtn" data-id="${n.from}">フォローバック</button>
+    `;
     notifyPopup.appendChild(div);
   });
 
   document.querySelectorAll(".fbBtn").forEach(btn=>{
-    btn.onclick=e=>{ followBack(e.target.dataset.id); };
+    btn.onclick=e=> followBack(e.target.dataset.id);
   });
 }
 
@@ -293,133 +267,247 @@ function followBack(uid){
     if(!arr.includes(uid)) arr.push(uid);
     database.ref("users/"+currentUser.uid+"/following").set(arr);
   });
+
   database.ref("notifications/"+currentUser.uid+"/list").once("value").then(s=>{
     const data=s.val()||{};
-    for(const k in data){ if(data[k].from===uid) database.ref("notifications/"+currentUser.uid+"/list/"+k).remove(); }
+    for(const k in data){
+      if(data[k].from===uid){
+        database.ref("notifications/"+currentUser.uid+"/list/"+k).remove();
+      }
+    }
   });
 }
 
 function pushFollowNotification(targetId){
   const ref=database.ref("notifications/"+targetId+"/list").push();
-  const d={id:ref.key, from:currentUser.uid, message:`${currentUser.displayName} さんがあなたをフォローしたがね！`, time:Date.now()};
+  const d={
+    id:ref.key,
+    from:currentUser.uid,
+    message:`${currentUser.displayName} さんがあなたをフォローしたがね！`,
+    time:Date.now()
+  };
   ref.set(d);
 }
 
-/* チャット一覧 */
+/* === チャット一覧 === */
 function loadChats(){
   database.ref("chats/"+currentUser.uid+"/list").on("value", snap=>{
     const data=snap.val()||{};
-    const arr=[]; const tasks=[];
+    const arr=[];
+    const tasks=[];
+
     for(const uid in data){
       tasks.push(
         database.ref("users/"+uid).once("value").then(us=>{
-          const u=us.val(); if(!u){ database.ref("chats/"+currentUser.uid+"/list/"+uid).remove(); return; }
-          arr.push({id:uid, displayName:u.displayName, photoURL:u.photoURL||"https://via.placeholder.com/40", lastMessage:data[uid].lastMessage||"", unread:data[uid].unread||0});
+          const u=us.val();
+          if(!u){
+            database.ref("chats/"+currentUser.uid+"/list/"+uid).remove();
+            return;
+          }
+          arr.push({
+            id:uid,
+            displayName:u.displayName,
+            photoURL:u.photoURL||"https://via.placeholder.com/40",
+            lastMessage:data[uid].lastMessage||"",
+            unread:data[uid].unread||0
+          });
         })
       );
     }
+
     Promise.all(tasks).then(()=>displayChats(arr));
   });
 }
+
 function displayChats(list){
-  chatListDiv.innerHTML="";
-  list.forEach(u=>{ chatListDiv.appendChild(createUserDiv(u,"chat")); });
+  chatList.innerHTML="";
+  list.forEach(u=>{
+    chatList.appendChild(createUserDiv(u,"chat"));
+  });
 }
 
-/* フォロー中一覧 */
+/* === フォロー一覧 === */
 function loadFollows(){
   database.ref("users/"+currentUser.uid+"/following").on("value", snap=>{
-    const arr=snap.val()||[]; const out=[]; const tasks=[];
+    const arr=snap.val()||[];
+    const out=[];
+    const tasks=[];
+
     arr.forEach(uid=>{
-      tasks.push(database.ref("users/"+uid).once("value").then(us=>{ const u=us.val(); if(!u) return; out.push({id:uid, displayName:u.displayName, photoURL:u.photoURL||"https://via.placeholder.com/40"}); }));
+      tasks.push(
+        database.ref("users/"+uid).once("value").then(us=>{
+          const u=us.val(); if(!u) return;
+          out.push({
+            id:uid,
+            displayName:u.displayName,
+            photoURL:u.photoURL||"https://via.placeholder.com/40"
+          });
+        })
+      );
     });
+
     Promise.all(tasks).then(()=>displayFollows(out));
   });
 }
+
 function displayFollows(list){
-  followListDiv.innerHTML="";
-  list.forEach(u=>{ followListDiv.appendChild(createUserDiv(u,"follow")); });
+  followList.innerHTML="";
+  list.forEach(u=>{
+    followList.appendChild(createUserDiv(u,"follow"));
+  });
 }
 
-/* 共通ユーザー行生成 */
+/* ======================== */
+/* 共通ユーザー行生成関数    */
+/* ======================== */
 function createUserDiv(user, mode){
-  const div=document.createElement("div"); div.className="listItem";
+  const div=document.createElement("div");
+  div.className="listItem";
 
-  const iconWrapper=document.createElement("div"); iconWrapper.className="iconWrapper";
-  const img=document.createElement("img"); img.className="userIcon"; img.src=user.photoURL;
+  const iconWrapper=document.createElement("div");
+  iconWrapper.className="iconWrapper";
+
+  const img=document.createElement("img");
+  img.className="userIcon";
+  img.src=user.photoURL;
   iconWrapper.appendChild(img);
-  if(user.unread>0){ const badge=document.createElement("div"); badge.className="badge"; badge.textContent=user.unread; iconWrapper.appendChild(badge); }
 
-  const nameBlock=document.createElement("div"); nameBlock.className="nameBlock";
-  const name=document.createElement("div"); name.className="userName"; name.textContent=user.displayName;
+  if(user.unread>0){
+    const badge=document.createElement("div");
+    badge.className="badge";
+    badge.textContent=user.unread;
+    iconWrapper.appendChild(badge);
+  }
+
+  const nameBlock=document.createElement("div");
+  nameBlock.className="nameBlock";
+
+  const name=document.createElement("div");
+  name.className="userName";
+  name.textContent=user.displayName;
   nameBlock.appendChild(name);
-  if(user.lastMessage!==undefined){ const msg=document.createElement("div"); msg.className="lastMsg"; msg.textContent=user.lastMessage; if(user.unread>0) msg.classList.add("unreadMsg"); nameBlock.appendChild(msg); }
 
-  div.appendChild(iconWrapper); div.appendChild(nameBlock);
+  if(user.lastMessage!==undefined){
+    const msg=document.createElement("div");
+    msg.className="lastMsg";
+    msg.textContent=user.lastMessage;
+    if(user.unread>0) msg.classList.add("unreadMsg");
+    nameBlock.appendChild(msg);
+  }
 
-  /* 検索フォローボタン */
+  div.appendChild(iconWrapper);
+  div.appendChild(nameBlock);
+
+  /* === 検索フォローボタン === */
   if(mode==="search"){
-    const btn=document.createElement("button"); btn.className="followBtn";
-    database.ref("users/"+currentUser.uid+"/following").once("value").then(s=>{ const arr=s.val()||[]; btn.textContent = arr.includes(user.id)?"フォロー中":"フォロー"; });
+    const btn=document.createElement("button");
+    btn.className="followBtn";
+
+    database.ref("users/"+currentUser.uid+"/following").once("value").then(s=>{
+      const arr=s.val()||[];
+      btn.textContent = arr.includes(user.id) ? "フォロー中" : "フォロー";
+    });
+
     btn.onclick=e=>{
       e.stopPropagation();
+
       database.ref("users/"+currentUser.uid+"/following").once("value").then(s=>{
         let arr=s.val()||[];
-        if(arr.includes(user.id)){ arr=arr.filter(v=>v!==user.id); btn.textContent="フォロー"; }
-        else{ arr.push(user.id); btn.textContent="フォロー中"; pushFollowNotification(user.id); }
+
+        if(arr.includes(user.id)){
+          arr = arr.filter(v=>v!==user.id);
+          btn.textContent="フォロー";
+        } else {
+          arr.push(user.id);
+          btn.textContent="フォロー中";
+          pushFollowNotification(user.id);
+        }
         database.ref("users/"+currentUser.uid+"/following").set(arr);
       });
     };
+
     div.appendChild(btn);
   }
 
-  /* フォロー中解除ボタン */
+  /* === フォロー解除ボタン === */
   if(mode==="follow"){
-    const btn=document.createElement("button"); btn.className="followBtn"; btn.textContent="解除";
+    const btn=document.createElement("button");
+    btn.className="followBtn";
+    btn.textContent="解除";
+
     btn.onclick=e=>{
       e.stopPropagation();
+
       database.ref("users/"+currentUser.uid+"/following").once("value").then(s=>{
-        let arr=s.val()||[]; arr=arr.filter(id=>id!==user.id);
+        let arr=s.val()||[];
+        arr = arr.filter(id=>id!==user.id);
+
         database.ref("users/"+currentUser.uid+"/following").set(arr);
       });
     };
+
     div.appendChild(btn);
   }
 
-  /* DM遷移（相互フォローのみ） */
+  /* === DM 遷移（相互フォローのみ） === */
   div.onclick=()=>{
     if(mode==="search") return;
+
     Promise.all([
       database.ref("users/"+user.id+"/following").once("value"),
       database.ref("users/"+currentUser.uid+"/following").once("value")
     ]).then(([theirSnap,mySnap])=>{
       const their = theirSnap.val()||[];
-      const mine = mySnap.val()||[];
+      const mine  = mySnap.val()||[];
+
       if(their.includes(currentUser.uid) && mine.includes(user.id)){
         location.href="dm.html?opponentId="+user.id;
-      } else { alert("相互フォローの相手のみDMできるがね！"); }
+      } else {
+        alert("相互フォローの相手のみDMできるがね！");
+      }
     });
   };
 
   return div;
 }
 
-/* 検索 */
+/* === 検索 === */
 searchBar.addEventListener("input", ()=>{
   const kw=searchBar.value.trim().toLowerCase();
-  if(!kw){ searchResultsDiv.style.display="none"; return; }
-  searchResultsDiv.style.display="block"; searchResultsDiv.innerHTML="";
+
+  if(!kw){
+    searchResults.style.display="none";
+    return;
+  }
+
+  searchResults.style.display="block";
+  searchResults.innerHTML="";
+
   database.ref("users").once("value").then(s=>{
     const users=s.val()||{};
+
     for(const uid in users){
       if(uid===currentUser.uid) continue;
-      const u=users[uid]; const name=(u.displayName||"").toLowerCase();
-      if(name.includes(kw)||uid.includes(kw)){
-        searchResultsDiv.appendChild(createUserDiv({id:uid, displayName:u.displayName, photoURL:u.photoURL||"https://via.placeholder.com/40"}, "search"));
+
+      const u=users[uid];
+      const name=(u.displayName||"").toLowerCase();
+
+      if(name.includes(kw) || uid.includes(kw)){
+        searchResults.appendChild(
+          createUserDiv(
+            {
+              id:uid,
+              displayName:u.displayName,
+              photoURL:u.photoURL||"https://via.placeholder.com/40"
+            }, 
+            "search"
+          )
+        );
       }
     }
   });
 });
+
 </script>
 </body>
   </html>
