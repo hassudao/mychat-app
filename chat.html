@@ -36,10 +36,21 @@ body.dark .listItem { background:#2b2b2b; border-color:#555; }
 
 .followBtn { padding:5px 8px; cursor:pointer; margin-left:8px; }
 
-#searchBar { width:260px; padding:5px; margin-bottom:10px; }
+#searchBar { width:220px; padding:5px; margin-bottom:10px; }
 #darkToggle { padding:5px 10px; margin-bottom:15px; cursor:pointer; }
 
 #notifyBtn { margin-left:10px; padding:5px 10px; cursor:pointer; }
+
+#profileBtn {          /* ← 追加！ */
+  margin-left:10px;
+  padding:5px 10px;
+  cursor:pointer;
+  background:#4e8cff;
+  color:white;
+  border:none;
+  border-radius:6px;
+}
+
 #notifyPopup {
   display:none;
   position:absolute;
@@ -65,10 +76,17 @@ body.dark #notifyPopup { background:#2b2b2b; border-color:#555; color:white; }
 
 <body>
 <h2>MyChat</h2>
+
 <button id="darkToggle">ダークモード切替</button>
 
-<input type="text" id="searchBar" placeholder="ユーザーを検索...">
-<button id="notifyBtn">🔔</button>
+<!-- 🔍 検索バー ＋ 🔔通知 ＋ ⚙プロフ設定 を横並び -->
+<div style="display:flex; align-items:center; margin-bottom:10px;">
+  <input type="text" id="searchBar" placeholder="ユーザーを検索...">
+  <button id="notifyBtn">🔔</button>
+
+  <!-- 🔧 プロフィール編集ボタン（追加） -->
+  <button id="profileBtn">⚙ プロフィール</button>
+</div>
 
 <div id="notifyPopup"></div>
 <div id="searchResults" class="listContainer" style="display:none;"></div>
@@ -102,6 +120,11 @@ const notifyPopup = document.getElementById("notifyPopup");
 const darkToggle = document.getElementById("darkToggle");
 
 let currentUser=null;
+
+/* ▼ 追加：プロフィール設定ボタン */
+document.getElementById("profileBtn").onclick = ()=>{
+  location.href="profile.html";
+};
 
 /* ダークモード */
 if(localStorage.getItem("darkMode")==="true") document.body.classList.add("dark");
