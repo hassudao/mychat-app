@@ -191,10 +191,48 @@ profileIconInput.onchange = ()=>{
   }
 };
 
-/* ▼プロフィール保存 */
+/* ▼プロフィール保存（完全修正版） */
 saveProfileBtn.onclick = async ()=>{
   const name = profileNameInput.value.trim();
-  let iconURL = profileIconPreview.src;
+  let iconURL = null;
+
+  // 現在のユーザー情報取得
+  const userRef = database.ref("users/"+currentUser.uid);
+  const userSnap = await userRef.once("value");
+  const userData = userSnap.val() || {};
+
+  // ▼アイコンを選択した場合のみアップロード
+  if(profileIconInput.files[0]){
+    const file = profileIconInput.files[0];
+    const storageRef = storage.ref("icons/" + currentUser.uid + ".jpg");
+
+    // アップロード
+    await storageRef.put(file);
+
+    // URL取得
+    iconURL = await storageRef.getDownloadURL();
+  } else {
+    // 画像未変更なら既存画像使う（なければプレースホルダー）
+    iconURL = userData.photoURL || currentUser.photoURL || "https://via.placeholder.com/70";
+  }
+
+  // ▼Realtime Database 更新
+  await userRef.update({
+    displayName: name,
+    photoURL: iconURL
+  });
+
+  // ▼Auth情報も同期
+  await currentUser.updateProfile({
+    displayName: name,
+    photoURL: iconURL
+  });
+
+  alert("保存したったがね‼️✨");
+  profileModal.style.display = "none";
+
+  loadProfileInfo(); // 即反映
+};
 
   /* アイコンアップロード */
   if(profileIconInput.files[0]){
